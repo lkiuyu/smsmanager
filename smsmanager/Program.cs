@@ -23,10 +23,44 @@ namespace smsmanager
             var host = CreateHostBuilder(args).Build();
             //Thread email = new Thread(new ThreadStart(emailForward));
             //email.Start();
+            isXmlExist();
             Task.Run(() => emailForward());
             host.Run();
         }
-        
+        public static void isXmlExist() 
+        {
+            string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
+            if (!File.Exists(orgCodePath)) 
+            {
+                XmlDocument xmlDoc = new XmlDocument();
+                //创建根节点  
+                XmlNode root = xmlDoc.CreateElement("userSettings");
+                xmlDoc.AppendChild(root);
+                CreateNode(xmlDoc, root, "username", "admin");
+                CreateNode(xmlDoc, root, "password", "admin");
+                CreateNode(xmlDoc, root, "emailFowardStatus", "0");
+                CreateNode(xmlDoc, root, "smtpHost", "");
+                CreateNode(xmlDoc, root, "smtpPort", "");
+                CreateNode(xmlDoc, root, "emailKey", "");
+                CreateNode(xmlDoc, root, "sendEmial", "");
+                CreateNode(xmlDoc, root, "reciveEmial", "");
+                try
+                {
+                    xmlDoc.Save(orgCodePath);
+                }
+                catch (Exception e)
+                {
+                    //显示错误信息  
+                    Console.WriteLine(e.Message);
+                }
+            }
+        }
+        public static void CreateNode(XmlDocument xmlDoc, XmlNode parentNode, string name, string value)
+        {
+            XmlNode node = xmlDoc.CreateNode(XmlNodeType.Element, name, null);
+            node.InnerText = value;
+            parentNode.AppendChild(node);
+        }
         public static void emailForward() 
         {
             Hashtable ht = new Hashtable();
