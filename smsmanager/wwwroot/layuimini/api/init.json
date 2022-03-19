@@ -1,0 +1,51 @@
+{
+  "homeInfo": {
+    "title": "首页",
+    "href": "Home/Welcome"
+  },
+  "logoInfo": {
+    "title": "短信管理",
+    "image": "Home/GetLogo",
+    "href": ""
+  },
+  "menuInfo": [
+    {
+      "title": "短信管理",
+      "icon": "fa fa-address-book",
+      "href": "",
+      "target": "_self",
+      "child": [
+        {
+          "title": "已发短信一览表",
+          "href": "Home/Sendedsms",
+          "icon": "fa fa-file-text",
+          "target": "_self"
+        },
+        {
+          "title": "暂存短信一览表",
+          "href": "Home/Tempdsms",
+          "icon": "fa fa-file-text",
+          "target": "_self"
+        },
+        {
+          "title": "写短信",
+          "href": "Home/SendingSms",
+          "icon": "fa fa-file-text",
+          "target": "_self"
+        },
+        {
+          "title": "收信",
+          "href": "Home/Receivesms",
+          "icon": "fa fa-file-text",
+          "target": "_self"
+        },
+        {
+          "title": "邮箱转发",
+          "href": "Home/Emailfoward",
+          "icon": "fa fa-file-text",
+          "target": "_self"
+        }
+      ]
+    }
+  ]
+}

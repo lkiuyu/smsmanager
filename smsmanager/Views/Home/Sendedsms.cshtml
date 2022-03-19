@@ -1,0 +1,95 @@
+﻿@{
+    Layout = null;
+}
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>已发短信一览表</title>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link rel="stylesheet" href="~/layuimini/lib/layui-v2.5.5/css/layui.css" media="all">
+    <link rel="stylesheet" href="~/layuimini/css/public.css" media="all">
+</head>
+<body>
+    <div class="layuimini-container">
+        <div class="layuimini-main">
+            
+            <table class="layui-hide" id="currentTableId" lay-filter="currentTableFilter"></table>
+
+            <script type="text/html" id="currentTableBar">
+                <a class="layui-btn layui-btn-normal layui-btn-xs data-count-edit" lay-event="view">查看</a>
+                <a class="layui-btn layui-btn-xs layui-btn-danger data-count-delete" lay-event="delete">删除</a>
+            </script>
+
+        </div>
+    </div>
+    <script src="~/layuimini/lib/layui-v2.5.5/layui.js" charset="utf-8"></script>
+    <script>
+    layui.use(['form', 'table'], function () {
+        var $ = layui.jquery,
+            form = layui.form,
+            table = layui.table;
+
+        table.render({
+            elem: '#currentTableId',
+            url: 'Sms_list',
+            toolbar: '#toolbarDemo',
+            defaultToolbar: ['filter', 'exports', 'print', {
+                title: '提示',
+                layEvent: 'LAYTABLE_TIPS',
+                icon: 'layui-icon-tips'
+            }],
+            cols: [[
+                { field: 'sid', width: 200, title: '短信编号', sort: true },
+                { field: 'tel', width: 200, title: '收信号码'},
+                { field: 'text', width: 200, title: '短信内容'},
+                { title: '操作', minWidth: 200, toolbar: '#currentTableBar', align: "center"}
+            ]],
+            limits: [5,10, 15, 20, 25, 50, 100],
+            limit: 5,
+            text: { none: '无数据' },
+            page: true,
+            skin: 'line',
+            done: function () {
+                $("[data-field='sid']").css('display', 'none');
+            }
+        });
+
+
+        table.on('tool(currentTableFilter)', function (obj) {
+            var data = obj.data;
+            if (obj.event === 'view') {
+                var page = 'ViewSms?tel=' + data.tel + '&smstext=' + data.text;
+                var index = layer.open({
+                    title: '查看短信',
+                    type: 2,
+                    shade: 0.2,
+                    maxmin:true,
+                    shadeClose: true,
+                    area: ['100%', '100%'],
+                    content: page,
+                });
+                $(window).on("resize", function () {
+                    layer.full(index);
+                });
+
+                return false;
+            }
+			else if (obj.event === 'delete') {
+                layer.confirm('真的要删除该短信吗', function (index) {
+                    window.location.href = "DeleteSms?id=" + data.sid+"&from=Sendedsms";
+                    obj.del();
+                    layer.close(index);
+                });
+
+            }
+        });
+
+    });
+    </script>
+
+</body>
+</html>

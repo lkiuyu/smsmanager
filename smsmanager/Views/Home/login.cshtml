@@ -1,0 +1,68 @@
+﻿@model User
+
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>短信管理 登录</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="robots" content="all,follow">
+    <link rel="stylesheet" href="~/moban2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="~/moban2/css/style.default.css" id="theme-stylesheet">
+</head>
+<body>
+    @using (Html.BeginForm())
+    {
+        @Html.AntiForgeryToken()
+        <div class="page login-page">
+            <div class="container d-flex align-items-center">
+                <div class="form-holder has-shadow">
+                    <div class="row">
+                        <!-- Logo & Information Panel-->
+                        <div class="col-lg-6">
+                            <div class="info d-flex align-items-center">
+                                <div class="content">
+                                    <div class="logo">
+                                        <h1>欢迎登录</h1>
+                                    </div>
+                                    <p>短信管理</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Form Panel    -->
+                        <div class="col-lg-6 bg-white">
+                            <div class="form d-flex align-items-center">
+                                <div class="content">
+                                    <div class="form-group">
+                                        @Html.EditorFor(model => model.uname, new { htmlAttributes = new { @class = "input-material", @placeholder = "请输入用户名" } })
+                                        @Html.ValidationMessageFor(model => model.uname, "", new { @class = "text-danger" })
+                                    </div>
+                                    <div class="form-group">
+                                        @Html.EditorFor(model => model.upassword, new { htmlAttributes = new { @class = "input-material", @placeholder = "请输入密码", @type = "password" } })
+                                        @Html.ValidationMessageFor(model => model.upassword, "", new { @class = "text-danger" })
+                                    </div>
+                                    <input type="submit" value="登录" name="登录" class="btn btn-primary" />
+                                    <br />
+                                    @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- JavaScript files-->
+        <script src="~/Scripts/jquery-3.4.1.min.js"></script>
+        <script src="~/Scripts/bootstrap.min.js"></script>
+        <script src="~/Scripts/jquery.validate.min.js"></script><!--表单验证-->
+        <!-- Main File-->
+        <script src="~/moban2/js/front.js"></script>
+    }
+</body>
+</html>
