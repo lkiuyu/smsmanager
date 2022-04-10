@@ -44,6 +44,12 @@
           "href": "Home/Emailfoward",
           "icon": "fa fa-file-text",
           "target": "_self"
+        },
+        {
+          "title": "企业微信转发",
+          "href": "Home/Wechatfoward",
+          "icon": "fa fa-file-text",
+          "target": "_self"
         }
       ]
     }

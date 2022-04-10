@@ -494,6 +494,49 @@ namespace smsmanager.Controllers
             return View("Emailfoward");
         }
 
+        public IActionResult Wechatfoward()
+        {
+            string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
+            XmlDocument xmldoc = new XmlDocument();
+            xmldoc.Load(orgCodePath);
+            XmlNodeList topM = xmldoc.SelectNodes("//userSettings");
+            foreach (XmlElement element in topM)
+            {
+                ViewBag.status = element.GetElementsByTagName("WeChatQYFowardStatus")[0].InnerText == "0" ? "" : "checked=\"\"";
+                ViewBag.qyid = element.GetElementsByTagName("WeChatQYID")[0].InnerText;
+                ViewBag.apid = element.GetElementsByTagName("WeChatQYApplicationID")[0].InnerText;
+                ViewBag.ApplicationSecret = element.GetElementsByTagName("WeChatQYApplicationSecret")[0].InnerText;
+            }
+            return View();
+        }
+        [HttpPost]
+        public IActionResult WechatfowardStatusChange(string kg, string qyid, string apid,string ApplicationSecret)
+        {
+            string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
+            XmlDocument MyXml = new XmlDocument();
+            MyXml.Load(orgCodePath);
+            //获取<Rule>节点的所有子节点
+            XmlNodeList topM = MyXml.SelectNodes("//userSettings");
+            //遍历<Rule>下的所有子节点
+            foreach (XmlElement element in topM)
+            {
+                element.GetElementsByTagName("WeChatQYFowardStatus")[0].InnerText = kg == "false" ? "0" : "1";
+                element.GetElementsByTagName("WeChatQYID")[0].InnerText = qyid;
+                element.GetElementsByTagName("WeChatQYApplicationID")[0].InnerText = apid;
+                element.GetElementsByTagName("WeChatQYApplicationSecret")[0].InnerText = ApplicationSecret;
+            }
+            MyXml.Save(orgCodePath);
+
+            foreach (XmlElement element in topM)
+            {
+                ViewBag.status = element.GetElementsByTagName("WeChatQYFowardStatus")[0].InnerText == "0" ? "" : "checked=\"\"";
+                ViewBag.qyid = element.GetElementsByTagName("WeChatQYID")[0].InnerText;
+                ViewBag.apid = element.GetElementsByTagName("WeChatQYApplicationID")[0].InnerText;
+                ViewBag.ApplicationSecret = element.GetElementsByTagName("WeChatQYApplicationSecret")[0].InnerText;
+            }
+            return View("Wechatfoward");
+        }
+
         public IActionResult EditPwd()
         {
             if (HttpContext.Session.GetString("uname") == null)
