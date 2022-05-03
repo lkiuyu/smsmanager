@@ -1,5 +1,5 @@
 # smsmanager
-用于ufi001b/c随身wifi刷了Debian后的短信管理图形化界面，支持实时短信Email转发
+用于部分随身wifi刷了Debian后的短信管理图形化界面，支持实时短信Email转发
 使用.net开发，运行需要配置.net 5.0.15运行库
 配置好后，进入程序的文件夹内，输入
 sudo dotnet smsmanager.dll
