@@ -24,6 +24,12 @@ namespace smsmanager.Controllers
             _logger = logger;
             _hostEnvironment = hostEnvironment;
         }
+        public void clear() 
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+        }
+
         //public HomeController(IWebHostEnvironment hostEnvironment)
         //{
         //    _hostEnvironment = hostEnvironment;
@@ -39,6 +45,7 @@ namespace smsmanager.Controllers
             if (user.uname == null || user.upassword == null)
             {
                 ModelState.AddModelError("", "用户名或密码为空");
+                clear();
                 return View(user);
             }
             else
@@ -60,11 +67,13 @@ namespace smsmanager.Controllers
                 if (userJudge)
                 {
                     HttpContext.Session.SetString("uname", user.uname);
+                    clear();
                     return View("Index");
                 }
                 else
                 {
                     ModelState.AddModelError("", "用户名或密码错误，登录失败！");
+                    clear();
                     return View(user);
                 }
 
@@ -78,6 +87,8 @@ namespace smsmanager.Controllers
                 var bytes = new byte[sw.Length];
                 sw.Read(bytes, 0, bytes.Length);
                 sw.Close();
+                sw.Dispose();
+                clear();
                 return new FileContentResult(bytes, "image/png");
             }
         }
@@ -88,6 +99,7 @@ namespace smsmanager.Controllers
             using (var process = System.Diagnostics.Process.Start(psi))
             {
                 var output = process.StandardOutput.ReadToEnd();
+                process.Kill();
                 if (output != string.Empty && output.Trim() != "No sms messages were found")
                 {
                     //int count = 0;
@@ -115,6 +127,7 @@ namespace smsmanager.Controllers
                     ViewBag.sendcount = sendcount;
                     ViewBag.tempcount = tempcount;
                     ViewBag.receivecount = receivecount;
+                    clear();
                     return View();
                 }
                 else
@@ -123,6 +136,7 @@ namespace smsmanager.Controllers
                     ViewBag.sendcount = 0;
                     ViewBag.tempcount = 0;
                     ViewBag.receivecount = 0;
+                    clear();
                     return View();
                 }
             }
@@ -131,23 +145,27 @@ namespace smsmanager.Controllers
         {
             if (HttpContext.Session.GetString("uname") == null)
             {
+                clear();
                 return Content("<script type='text/javascript'>alert('登录失效!');window.location.href='login';</script>");
             }
             else
             {
                 string adminname = HttpContext.Session.GetString("uname");
                 ViewBag.name = adminname;
+                clear();
                 return View();
             }
         }
         public IActionResult LoginOut()
         {
             HttpContext.Session.Clear();
+            clear();
             return RedirectToAction("login");
         }
 
         public IActionResult Sendedsms()
         {
+            clear();
             return View();
         }
         public IActionResult Sms_list(int page, int limit)
@@ -157,6 +175,7 @@ namespace smsmanager.Controllers
             using (var process = System.Diagnostics.Process.Start(psi))
             {
                 var output = process.StandardOutput.ReadToEnd();
+                process.Kill();
                 if (output != string.Empty&& output.Trim() != "No sms messages were found")
                 {
                     //int count = 0;
@@ -174,6 +193,7 @@ namespace smsmanager.Controllers
                             using (var process2 = System.Diagnostics.Process.Start(psi2))
                             {
                                 var output2 = process2.StandardOutput.ReadToEnd();
+                                process2.Kill();
                                 if (output2 != string.Empty)
                                 {
                                     string[] qline2 = output2.Split(Environment.NewLine.ToCharArray());
@@ -187,10 +207,12 @@ namespace smsmanager.Controllers
                     }
                     var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderBy(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList()};//构造出适配layui表格的json格式
                     //return Json(newdata, JsonRequestBehavior.AllowGet);//转为json并返回至前台
+                     clear();
                     return Json(newdata);
                 }
                 else
                 {
+                    clear();
                     return Json(new { code = 0, msg = "", count = 0, data = "" });
                 }
             }
@@ -200,6 +222,7 @@ namespace smsmanager.Controllers
         {
             ViewBag.tel = tel;
             ViewBag.smstext = smstext;
+            clear();
             return View(); 
         }
         public IActionResult DeleteSms(int id,string from)
@@ -212,17 +235,21 @@ namespace smsmanager.Controllers
             {
                 var output = process.StandardOutput.ReadToEnd();
                 var error= process.StandardError.ReadToEnd();
+                process.Kill();
                 if (output.Trim() == "successfully deleted SMS from modem")
                 {
+                    clear();
                     return RedirectToAction(from);
                 }
                 else if (error.Trim() == "error: couldn't delete SMS: 'GDBus.Error:org.freedesktop.ModemManager1.Error.Core.Failed: Couldn't delete 1 parts from this SMS'")
                 {
                     doubleDeleteSms(id);
+                    clear();
                     return RedirectToAction(from);
                 }
                 else
                 {
+                    clear();
                     return RedirectToAction(from);
                 }
             }
@@ -238,15 +265,18 @@ namespace smsmanager.Controllers
             {
                 var output = process.StandardOutput.ReadToEnd();
                 var error = process.StandardError.ReadToEnd();
+                process.Kill();
                 if (error.Trim() == "couldn't delete SMS: 'GDBus.Error:org.freedesktop.ModemManager1.Error.Core.Failed: Couldn't delete 1 parts from this SMS'")
                 {
                     doubleDeleteSms(id);
                 }
             }
+            clear();
         }
 
         public IActionResult Tempdsms()
         {
+            clear();
             return View();
         }
         public IActionResult TempSms_list(int page, int limit)
@@ -256,6 +286,7 @@ namespace smsmanager.Controllers
             using (var process = System.Diagnostics.Process.Start(psi))
             {
                 var output = process.StandardOutput.ReadToEnd();
+                process.Kill();
                 if (output != string.Empty && output.Trim() != "No sms messages were found")
                 {
                     //int count = 0;
@@ -273,6 +304,7 @@ namespace smsmanager.Controllers
                             using (var process2 = System.Diagnostics.Process.Start(psi2))
                             {
                                 var output2 = process2.StandardOutput.ReadToEnd();
+                                process2.Kill();
                                 if (output2 != string.Empty)
                                 {
                                     string[] qline2 = output2.Split(Environment.NewLine.ToCharArray());
@@ -286,10 +318,12 @@ namespace smsmanager.Controllers
                     }
                     var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderBy(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList() };//构造出适配layui表格的json格式
                     //return Json(newdata, JsonRequestBehavior.AllowGet);//转为json并返回至前台
+                     clear();
                     return Json(newdata);
                 }
                 else
                 {
+                    clear();
                     return Json(new { code = 0, msg = "", count = 0, data = "" });
                 }
             }
@@ -300,6 +334,7 @@ namespace smsmanager.Controllers
             ViewBag.sid = id;
             ViewBag.tel = tel;
             ViewBag.smstext = smstext;
+            clear();
             return View();
         }
         [HttpPost]
@@ -310,6 +345,7 @@ namespace smsmanager.Controllers
             using (var process = System.Diagnostics.Process.Start(psi))
             {
                 var output = process.StandardOutput.ReadToEnd();
+                process.Kill();
                 if (output.Trim() == "successfully deleted SMS from modem")
                 {
                     var psi1 = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-create-sms=\"text ='" + text + "', number = '" + Regex.Replace(tel, @"\s", "") + "'\"");
@@ -317,14 +353,17 @@ namespace smsmanager.Controllers
                     using (var process1 = System.Diagnostics.Process.Start(psi1))
                     {
                         var output1 = process1.StandardOutput.ReadToEnd();
+                        process1.Kill();
                         if (output1.Split(":")[0].Trim() == "Successfully created new SMS")
                         {
                             ViewBag.js = "<script type='text/javascript'>alert('修改成功！');layui.use(['form'], function() {var form = layui.form,layer = layui.layer,$ = layui.$;function close(){var iframeIndex = parent.layer.getFrameIndex(window.name);parent.layer.close(iframeIndex);window.parent.location.reload();}close();});</script>";
+                            clear();
                             return View("EditSms");
                         }
                         else
                         {
                             ViewBag.js = "<script type='text/javascript'>alert('修改失败！');layui.use(['form'], function() {var form = layui.form,layer = layui.layer,$ = layui.$;function close(){var iframeIndex = parent.layer.getFrameIndex(window.name);parent.layer.close(iframeIndex);window.parent.location.reload();}close();});</script>";
+                            clear();
                             return View("EditSms");
                         }
                     }
@@ -332,6 +371,7 @@ namespace smsmanager.Controllers
                 else
                 {
                     ViewBag.js = "<script type='text/javascript'>alert('修改失败！');layui.use(['form'], function() {var form = layui.form,layer = layui.layer,$ = layui.$;function close(){var iframeIndex = parent.layer.getFrameIndex(window.name);parent.layer.close(iframeIndex);window.parent.location.reload();}close();});</script>";
+                    clear();
                     return View();
                 }
             }
@@ -343,12 +383,15 @@ namespace smsmanager.Controllers
             using (var process = System.Diagnostics.Process.Start(psi))
             {
                 var output = process.StandardOutput.ReadToEnd();
+                process.Kill();
                 if (output.Trim() == "successfully sent the SMS")
                 {
+                    clear();
                     return RedirectToAction("Sendedsms");
                 }
                 else
                 {
+                    clear();
                     return RedirectToAction("Tempdsms");
                 }
             }
@@ -361,18 +404,22 @@ namespace smsmanager.Controllers
             using (var process = System.Diagnostics.Process.Start(psi))
             {
                 var output = process.StandardOutput.ReadToEnd();
+                process.Kill();
                 if (output.Split(":")[0].Trim() == "Successfully created new SMS")
                 {
+                    clear();
                     return RedirectToAction("Tempdsms");
                 }
                 else
                 {
+                    clear();
                     return RedirectToAction("SendingSms");
                 }
             }
         }
         public IActionResult SendingSms()
         {
+            clear();
             return View(); 
         }
         [HttpPost]
@@ -383,21 +430,25 @@ namespace smsmanager.Controllers
             using (var process = System.Diagnostics.Process.Start(psi))
             {
                 var output = process.StandardOutput.ReadToEnd();
+                process.Kill();
                 if (output.Split(":")[0].Trim() == "Successfully created new SMS")
                 {
                     string sid = output.Split(":")[1].Split("SMS/")[1].Trim();
                     SendSms(Convert.ToInt32(sid));
+                    clear();
                     return View("Sendedsms");
                 }
                 else
                 {
                     ViewBag.js = "<script>alert('发送失败！');</script>";
+                    clear();
                     return View("SendingSms");
                 }
             }
         }
         public IActionResult Receivesms()
         {
+            clear();
             return View();
         }
         public IActionResult ReceiveSms_list(int page, int limit)
@@ -407,6 +458,7 @@ namespace smsmanager.Controllers
             using (var process = System.Diagnostics.Process.Start(psi))
             {
                 var output = process.StandardOutput.ReadToEnd();
+                process.Kill();
                 if (output != string.Empty && output.Trim() != "No sms messages were found")
                 {
                     //int count = 0;
@@ -424,6 +476,7 @@ namespace smsmanager.Controllers
                             using (var process2 = System.Diagnostics.Process.Start(psi2))
                             {
                                 var output2 = process2.StandardOutput.ReadToEnd();
+                                process2.Kill();
                                 if (output2 != string.Empty)
                                 {
                                     string[] qline2 = output2.Split(Environment.NewLine.ToCharArray());
@@ -436,11 +489,13 @@ namespace smsmanager.Controllers
                         }
                     }
                     var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderBy(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList() };//构造出适配layui表格的json格式
-                    //return Json(newdata, JsonRequestBehavior.AllowGet);//转为json并返回至前台
+                                                                                                                                                                //return Json(newdata, JsonRequestBehavior.AllowGet);//转为json并返回至前台
+                    clear();
                     return Json(newdata);
                 }
                 else
                 {
+                    clear();
                     return Json(new { code = 0, msg = "", count = 0, data = "" });
                 }
             }
@@ -460,6 +515,7 @@ namespace smsmanager.Controllers
                 ViewBag.sendEmial = element.GetElementsByTagName("sendEmial")[0].InnerText;
                 ViewBag.reciveEmial = element.GetElementsByTagName("reciveEmial")[0].InnerText;
             }
+            clear();
             return View();
         }
         [HttpPost]
@@ -491,6 +547,7 @@ namespace smsmanager.Controllers
                 ViewBag.sendEmial = element.GetElementsByTagName("sendEmial")[0].InnerText;
                 ViewBag.reciveEmial = element.GetElementsByTagName("reciveEmial")[0].InnerText;
             }
+            clear();
             return View("Emailfoward");
         }
 
@@ -507,6 +564,7 @@ namespace smsmanager.Controllers
                 ViewBag.apid = element.GetElementsByTagName("WeChatQYApplicationID")[0].InnerText;
                 ViewBag.ApplicationSecret = element.GetElementsByTagName("WeChatQYApplicationSecret")[0].InnerText;
             }
+            clear();
             return View();
         }
         [HttpPost]
@@ -534,6 +592,7 @@ namespace smsmanager.Controllers
                 ViewBag.apid = element.GetElementsByTagName("WeChatQYApplicationID")[0].InnerText;
                 ViewBag.ApplicationSecret = element.GetElementsByTagName("WeChatQYApplicationSecret")[0].InnerText;
             }
+            clear();
             return View("Wechatfoward");
         }
 
@@ -541,10 +600,12 @@ namespace smsmanager.Controllers
         {
             if (HttpContext.Session.GetString("uname") == null)
             {
+                clear();
                 return Content("<script type='text/javascript'>alert('登录失效!');window.location.href='login';</script>");
             }
             else
             {
+                clear();
                 return View();
             }
         }
@@ -560,6 +621,7 @@ namespace smsmanager.Controllers
         {
             if (HttpContext.Session.GetString("uname") == null)
             {
+                clear();
                 return Content("<script type='text/javascript'>alert('登录失效!');window.location.href='login';</script>");
             }
             else
@@ -569,11 +631,13 @@ namespace smsmanager.Controllers
                 if (oapwd.Trim() == "" || napwd.Trim() == "" || againnapwd.Trim() == "")//判断是否为空
                 {
                     ViewBag.js = "<script>alert('新密码或旧密码为空！');</script>";
+                    clear();
                     return View();
                 }
                 else if (napwd != againnapwd)//判断两次新密码是否一致
                 {
                     ViewBag.js = "<script>alert('新密码两次输入不一致！');</script>";
+                    clear();
                     return View();
                 }
                 else
@@ -596,11 +660,13 @@ namespace smsmanager.Controllers
                         }
                         xmldoc.Save(orgCodePath);
                         ViewBag.js = "<script type='text/javascript'>alert('修改成功！');layui.use(['form'], function() {var form = layui.form,layer = layui.layer;function close(){var iframeIndex = parent.layer.getFrameIndex(window.name);parent.layer.close(iframeIndex);window.parent.location.replace('LoginOut');}close();});</script>";
+                        clear();
                         return View();
                     }
                     else
                     {
                         ViewBag.js = "<script>alert('旧的密码输入错误！');</script>";
+                        clear();
                         return View();
                     }
                 }
@@ -610,6 +676,7 @@ namespace smsmanager.Controllers
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {
+            clear();
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
     }
