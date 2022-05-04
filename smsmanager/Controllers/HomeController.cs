@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using smsmanager.Models;
 using System;
 using System.Collections.Generic;
@@ -9,6 +11,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml;
@@ -168,8 +171,16 @@ namespace smsmanager.Controllers
             clear();
             return View();
         }
-        public IActionResult Sms_list(int page, int limit)
+        public IActionResult Sms_list(int page, int limit, string tel = "", string text = "")
         {
+            if (tel == "_-")
+            {
+                tel = "";
+            }
+            if (text == "_-")
+            {
+                text = "";
+            }
             var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-list-sms");
             psi.RedirectStandardOutput = true;
             using (var process = System.Diagnostics.Process.Start(psi))
@@ -198,14 +209,38 @@ namespace smsmanager.Controllers
                                 {
                                     string[] qline2 = output2.Split(Environment.NewLine.ToCharArray());
                                     s.tel = qline2[3].Split("|")[1].Trim().Split(":")[1].Trim();
-                                    s.text = qline2[4].Split("|")[1].Trim().Split(":")[1].Trim();
+                                    s.text = qline2[4].Split("|      text:")[1].Trim();
                                 }
                             }
-                            list.Add(s);
+                            if (!string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
+                            {
+                                if (Contains(s.tel, tel) && Contains(s.text, text))
+                                {
+                                    list.Add(s);
+                                }
+                            }
+                            else if (string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
+                            {
+                                if (Contains(s.text, text))
+                                {
+                                    list.Add(s);
+                                }
+                            }
+                            else if (!string.IsNullOrEmpty(tel) && string.IsNullOrEmpty(text))
+                            {
+                                if (Contains(s.tel, tel))
+                                {
+                                    list.Add(s);
+                                }
+                            }
+                            else
+                            {
+                                list.Add(s);
+                            }
                             //count++;
                         }
                     }
-                    var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderBy(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList()};//构造出适配layui表格的json格式
+                    var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderByDescending(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList()};//构造出适配layui表格的json格式
                     //return Json(newdata, JsonRequestBehavior.AllowGet);//转为json并返回至前台
                      clear();
                     return Json(newdata);
@@ -279,8 +314,16 @@ namespace smsmanager.Controllers
             clear();
             return View();
         }
-        public IActionResult TempSms_list(int page, int limit)
+        public IActionResult TempSms_list(int page, int limit, string tel = "", string text = "")
         {
+            if (tel == "_-")
+            {
+                tel = "";
+            }
+            if (text == "_-")
+            {
+                text = "";
+            }
             var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-list-sms");
             psi.RedirectStandardOutput = true;
             using (var process = System.Diagnostics.Process.Start(psi))
@@ -309,14 +352,38 @@ namespace smsmanager.Controllers
                                 {
                                     string[] qline2 = output2.Split(Environment.NewLine.ToCharArray());
                                     s.tel = qline2[3].Split("|")[1].Trim().Split(":")[1].Trim();
-                                    s.text = qline2[4].Split("|")[1].Trim().Split(":")[1].Trim();
+                                    s.text = qline2[4].Split("|      text:")[1].Trim();
                                 }
                             }
-                            list.Add(s);
+                            if (!string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
+                            {
+                                if (Contains(s.tel, tel) && Contains(s.text, text))
+                                {
+                                    list.Add(s);
+                                }
+                            }
+                            else if (string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
+                            {
+                                if (Contains(s.text, text))
+                                {
+                                    list.Add(s);
+                                }
+                            }
+                            else if (!string.IsNullOrEmpty(tel) && string.IsNullOrEmpty(text))
+                            {
+                                if (Contains(s.tel, tel))
+                                {
+                                    list.Add(s);
+                                }
+                            }
+                            else
+                            {
+                                list.Add(s);
+                            }
                             //count++;
                         }
                     }
-                    var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderBy(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList() };//构造出适配layui表格的json格式
+                    var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderByDescending(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList() };//构造出适配layui表格的json格式
                     //return Json(newdata, JsonRequestBehavior.AllowGet);//转为json并返回至前台
                      clear();
                     return Json(newdata);
@@ -451,8 +518,16 @@ namespace smsmanager.Controllers
             clear();
             return View();
         }
-        public IActionResult ReceiveSms_list(int page, int limit)
+        public IActionResult ReceiveSms_list(int page, int limit, string tel = "", string text = "")
         {
+            if (tel == "_-")
+            {
+                tel = "";
+            }
+            if (text == "_-")
+            {
+                text = "";
+            }
             var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-list-sms");
             psi.RedirectStandardOutput = true;
             using (var process = System.Diagnostics.Process.Start(psi))
@@ -481,14 +556,38 @@ namespace smsmanager.Controllers
                                 {
                                     string[] qline2 = output2.Split(Environment.NewLine.ToCharArray());
                                     s.tel = qline2[3].Split("|")[1].Trim().Split(":")[1].Trim();
-                                    s.text = qline2[4].Split("|")[1].Trim().Split(":")[1].Trim();
+                                    s.text = qline2[4].Split("|      text:")[1].Trim();
                                 }
                             }
-                            list.Add(s);
+                            if (!string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
+                            {
+                                if (Contains(s.tel, tel) && Contains(s.text, text))
+                                {
+                                    list.Add(s);
+                                }
+                            }
+                            else if (string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
+                            {
+                                if (Contains(s.text, text))
+                                {
+                                    list.Add(s);
+                                }
+                            }
+                            else if (!string.IsNullOrEmpty(tel) && string.IsNullOrEmpty(text))
+                            {
+                                if (Contains(s.tel, tel))
+                                {
+                                    list.Add(s);
+                                }
+                            }
+                            else
+                            {
+                                list.Add(s);
+                            }
                             //count++;
                         }
                     }
-                    var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderBy(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList() };//构造出适配layui表格的json格式
+                    var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderByDescending(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList() };//构造出适配layui表格的json格式
                                                                                                                                                                 //return Json(newdata, JsonRequestBehavior.AllowGet);//转为json并返回至前台
                     clear();
                     return Json(newdata);
@@ -500,6 +599,112 @@ namespace smsmanager.Controllers
                 }
             }
         }
+        public IActionResult DeleteSmsHistory(string id)
+        {
+            string smssavedPath = AppDomain.CurrentDomain.BaseDirectory + "smssaved.json";
+            StreamReader file = new StreamReader(smssavedPath, Encoding.Default);
+            string jsonstring = file.ReadToEnd();
+            file.Close();
+            file.Dispose();
+            JArray ja = new JArray();
+            if (jsonstring.Length > 0)
+            {
+                Sms[] datas = JsonConvert.DeserializeObject<Sms[]>(jsonstring);
+                foreach (Sms item in datas)
+                {
+                    if (item.sid!= id)
+                    {
+                        JObject jobj = new JObject();
+                        jobj.Add("sid", item.sid);
+                        jobj.Add("tel", item.tel);
+                        jobj.Add("text", item.text);
+                        ja.Add(jobj);
+                    }
+                }
+                using (FileStream fs = new FileStream(smssavedPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite))
+                {
+                    fs.Seek(0, SeekOrigin.Begin);
+                    fs.SetLength(0);
+                    using (StreamWriter sw = new StreamWriter(fs, Encoding.UTF8))
+                    {
+                        sw.Write(ja.ToString());
+                    }
+                }
+                clear();
+                return RedirectToAction("ReceivesmsHistory");
+            }
+            else
+            {
+                clear();
+                return RedirectToAction("ReceivesmsHistory");
+            }
+
+        }
+
+        public IActionResult ReceivesmsHistory()
+        {
+            clear();
+            return View();
+        }
+        public IActionResult ReceivesmsHistory_list(int page, int limit,string tel="",string text="")
+        {
+            if (tel=="_-")
+            {
+                tel = "";
+            }
+            if (text == "_-")
+            {
+                text = "";
+            }
+            string smssavedPath = AppDomain.CurrentDomain.BaseDirectory + "smssaved.json";
+            StreamReader file = new StreamReader(smssavedPath, Encoding.Default);
+            string jsonstring = file.ReadToEnd();
+            file.Close();
+            file.Dispose();
+            List<Sms> list = new List<Sms>();
+            if (jsonstring.Length > 0)
+            {
+                Sms[] datas = JsonConvert.DeserializeObject<Sms[]>(jsonstring);
+                foreach (Sms item in datas)
+                {
+                    if (!string.IsNullOrEmpty(tel)&& !string.IsNullOrEmpty(text))
+                    {
+                        if (Contains(item.tel, tel)&& Contains(item.text, text))
+                        {
+                            list.Add(item);
+                        }
+                    }
+                    else if (string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
+                    {
+                        if (Contains(item.text, text))
+                        {
+                            list.Add(item);
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(tel) && string.IsNullOrEmpty(text))
+                    {
+                        if (Contains(item.tel, tel))
+                        {
+                            list.Add(item);
+                        }
+                    }
+                    else
+                    {
+                        list.Add(item);
+                    }
+
+                }
+                var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderByDescending(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList() };//构造出适配layui表格的json格式                                                                                                                                        //return Json(newdata, JsonRequestBehavior.AllowGet);//转为json并返回至前台
+                clear();
+                return Json(newdata);
+            }
+            else
+            {
+                clear();
+                return Json(new { code = 0, msg = "", count = 0, data = "" });
+            }
+        }
+
         public IActionResult Emailfoward()
         {
             string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
@@ -672,7 +877,11 @@ namespace smsmanager.Controllers
                 }
             }
         }
-
+        public bool Contains(string source, string toCheck)
+        {
+            clear();
+            return source.IndexOf(toCheck, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {

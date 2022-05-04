@@ -1,8 +1,10 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Quartz;
 using Quartz.Impl;
 using Quartz.Simpl;
 using Quartz.Xml;
+using smsmanager.Models;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -10,6 +12,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Mail;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
@@ -27,10 +30,12 @@ namespace smsmanager
 
         static Hashtable ht = new Hashtable();
         static Hashtable htWc = new Hashtable();
+        static Hashtable htSa = new Hashtable();
 
         public void emailForward()
         {
             string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
+            string smssavedPath = AppDomain.CurrentDomain.BaseDirectory + "smssaved.json";
             //Console.WriteLine(File.Exists(orgCodePath));
             if (File.Exists(orgCodePath))
             {
@@ -81,7 +86,7 @@ namespace smsmanager
                                                 {
                                                     string[] qline2 = output2.Split(Environment.NewLine.ToCharArray());
                                                     string tel = qline2[3].Split("|")[1].Trim().Split(":")[1].Trim();
-                                                    string text = qline2[4].Split("|")[1].Trim().Split(":")[1].Trim();
+                                                    string text = qline2[4].Split("|      text:")[1].Trim();
                                                     ht.Add(sid, tel + "_" + text);
                                                     MailAddress to = new MailAddress(element.GetElementsByTagName("reciveEmial")[0].InnerText);
                                                     MailAddress from = new MailAddress(element.GetElementsByTagName("sendEmial")[0].InnerText);
@@ -120,6 +125,7 @@ namespace smsmanager
                         using (var process = System.Diagnostics.Process.Start(psi))
                         {
                             var output = process.StandardOutput.ReadToEnd();
+                            process.Kill();
                             if (output != string.Empty && output.Trim() != "No sms messages were found")
                             {
                                 //int count = 0;
@@ -137,13 +143,15 @@ namespace smsmanager
                                             using (var process2 = System.Diagnostics.Process.Start(psi2))
                                             {
                                                 var output2 = process2.StandardOutput.ReadToEnd();
+                                                process2.Kill();
                                                 if (output2 != string.Empty)
                                                 {
+                                                    string[] qline2 = output2.Split(Environment.NewLine.ToCharArray());
+                                                    string tel = qline2[3].Split("|")[1].Trim().Split(":")[1].Trim();
+                                                    string text = qline2[4].Split("|      text:")[1].Trim();
+                                                    htWc.Add(sid, tel + "_" + text);
                                                     try
                                                     {
-                                                        string[] qline2 = output2.Split(Environment.NewLine.ToCharArray());
-                                                        string tel = qline2[3].Split("|")[1].Trim().Split(":")[1].Trim();
-                                                        string text = qline2[4].Split("|")[1].Trim().Split(":")[1].Trim();
                                                         string corpid = element.GetElementsByTagName("WeChatQYID")[0].InnerText;
                                                         string corpsecret = element.GetElementsByTagName("WeChatQYApplicationSecret")[0].InnerText;
                                                         string agentid = element.GetElementsByTagName("WeChatQYApplicationID")[0].InnerText;
@@ -175,7 +183,6 @@ namespace smsmanager
                                                             string errmsg1 = jsonObjresult["errmsg"].ToString();
                                                             if (errcode == "0" && errmsg == "ok")
                                                             {
-                                                                htWc.Add(sid, tel + "_" + text);
                                                                 Console.WriteLine("企业微信转发成功");
                                                             }
                                                             else
@@ -187,13 +194,96 @@ namespace smsmanager
                                                         {
                                                             Console.WriteLine(errmsg);
                                                         }
+                                                        
                                                     }
                                                     catch (Exception ex)
                                                     {
                                                         Console.WriteLine(ex);
                                                     }
+                                                   
                                                 }
                                             }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (File.Exists(smssavedPath))
+            {
+                Thread.Sleep(1000);
+                var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-list-sms");
+                psi.RedirectStandardOutput = true;
+                using (var process = System.Diagnostics.Process.Start(psi))
+                {
+                    var output = process.StandardOutput.ReadToEnd();
+                    process.Kill();
+                    if (output != string.Empty && output.Trim() != "No sms messages were found")
+                    {
+                        //int count = 0;
+                        string[] qline = output.Split(Environment.NewLine.ToCharArray());
+                        for (int i = 0; i < qline.Count() - 1; i++)
+                        {
+                            string[] theRow = qline[i].Split("(");
+                            if (theRow[1].Trim() == "received)")
+                            {
+                                if (!htSa.Contains(theRow[0].Trim().Split("SMS/")[1].ToString().Trim()))
+                                {
+                                    string sid = theRow[0].Trim().Split("SMS/")[1].ToString().Trim();
+                                    var psi2 = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 -s " + sid);
+                                    psi2.RedirectStandardOutput = true;
+                                    using (var process2 = System.Diagnostics.Process.Start(psi2))
+                                    {
+                                        var output2 = process2.StandardOutput.ReadToEnd();
+                                        process2.Kill();
+                                        if (output2 != string.Empty)
+                                        {
+                                            string[] qline2 = output2.Split(Environment.NewLine.ToCharArray());
+                                            string tel = qline2[3].Split("|")[1].Trim().Split(":")[1].Trim();
+                                            string text = qline2[4].Split("|      text:")[1].Trim();
+                                            string timestamp = qline2[8].Split("|")[1].Trim().Split("timestamp:")[1].Trim();
+                                            JArray ja = new JArray();
+                                            StreamReader file = new StreamReader(smssavedPath, Encoding.Default);
+                                            string jsonstring = file.ReadToEnd();
+                                            file.Close();
+                                            file.Dispose();
+                                            bool SmsExistJudge = false;
+                                            if (jsonstring.Length>0)
+                                            {
+                                                Sms[] datas = JsonConvert.DeserializeObject<Sms[]>(jsonstring);
+                                                foreach(Sms item in datas)
+                                                {
+                                                    if (timestamp + "_" + tel + "_" + sid== item.sid)
+                                                    {
+                                                        SmsExistJudge = true;
+                                                    }
+                                                    JObject jobj = new JObject();
+                                                    jobj.Add("sid", item.sid);
+                                                    jobj.Add("tel", item.tel);
+                                                    jobj.Add("text", item.text);
+                                                    ja.Add(jobj);
+                                                }
+                                            }
+                                            if (!SmsExistJudge)
+                                            {
+                                                JObject jobj1 = new JObject();
+                                                jobj1.Add("sid", timestamp + "_" + tel + "_" + sid);
+                                                jobj1.Add("tel", tel);
+                                                jobj1.Add("text", text);
+                                                ja.Add(jobj1);
+                                            }
+                                            using (FileStream fs = new FileStream(smssavedPath, FileMode.OpenOrCreate,FileAccess.ReadWrite, FileShare.ReadWrite))
+                                            {
+                                                fs.Seek(0, SeekOrigin.Begin);
+                                                fs.SetLength(0);
+                                                using (StreamWriter sw = new StreamWriter(fs, Encoding.UTF8))
+                                                {
+                                                    sw.Write(ja.ToString());
+                                                }
+                                            }
+                                            htSa.Add(sid, tel + "_" + text);
                                         }
                                     }
                                 }

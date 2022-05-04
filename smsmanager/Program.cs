@@ -33,6 +33,7 @@ namespace smsmanager
         public static void isXmlExist()
         {
             string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
+            string smssavedPath = AppDomain.CurrentDomain.BaseDirectory + "smssaved.json";
             if (!File.Exists(orgCodePath))
             {
                 XmlDocument xmlDoc = new XmlDocument();
@@ -60,6 +61,12 @@ namespace smsmanager
                     //œ‘ æ¥ÌŒÛ–≈œ¢  
                     Console.WriteLine(e.Message);
                 }
+            }
+            if (!File.Exists(smssavedPath))
+            {
+                FileStream fs = new FileStream(smssavedPath, FileMode.Create);
+                fs.Close();
+                fs.Dispose();
             }
         }
         public static void CreateNode(XmlDocument xmlDoc, XmlNode parentNode, string name, string value)

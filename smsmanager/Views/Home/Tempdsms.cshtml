@@ -16,7 +16,30 @@
 <body>
     <div class="layuimini-container">
         <div class="layuimini-main">
-
+            <fieldset class="table-search-fieldset">
+                <legend>搜索信息</legend>
+                <div style="margin: 10px 10px 10px 10px">
+                    <form class="layui-form layui-form-pane" action="">
+                        <div class="layui-form-item">
+                            <div class="layui-inline">
+                                <label class="layui-form-label">号码</label>
+                                <div class="layui-input-inline">
+                                    <input type="text" name="tel" autocomplete="off" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-inline">
+                                <label class="layui-form-label">短信内容</label>
+                                <div class="layui-input-inline">
+                                    <input type="text" name="text" autocomplete="off" class="layui-input">
+                                </div>
+                            </div>
+                            <div class="layui-inline">
+                                <button type="button" class="layui-btn layui-btn-primary" lay-submit lay-filter="data-search-btn"><i class="layui-icon"></i> 搜 索</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </fieldset>
             <table class="layui-hide" id="currentTableId" lay-filter="currentTableFilter"></table>
 
             <script type="text/html" id="currentTableBar">
@@ -47,8 +70,8 @@
             cols: [[
                 { field: 'sid', width: 200, title: '短信编号', sort: true },
                 { field: 'tel', width: 200, title: '收信号码'},
-                { field: 'text', width: 200, title: '短信内容'},
-                { title: '操作', minWidth: 200, toolbar: '#currentTableBar', align: "center"}
+                { field: 'text', width: 400, title: '短信内容'},
+                { title: '操作', minWidth: 150, toolbar: '#currentTableBar', align: "center"}
             ]],
             limits: [5,10, 15, 20, 25, 50, 100],
             limit: 5,
@@ -59,7 +82,19 @@
                 $("[data-field='sid']").css('display', 'none');
             }
         });
-
+        form.on('submit(data-search-btn)', function (data) {
+            //var result = JSON.stringify(data.field);
+            //执行搜索重载
+            table.reload('currentTableId', {
+                page: {
+                    curr: 1
+                }
+                , where: {
+                    tel: data.field['tel'] == "" ? "_-" : data.field['tel'],
+                    text: data.field['text'] == "" ? "_-" : data.field['text']
+                }
+            }, 'data');
+        });
 
         table.on('tool(currentTableFilter)', function (obj) {
             var data = obj.data;
@@ -88,7 +123,7 @@
                     shade: 0.2,
                     maxmin: true,
                     shadeClose: true,
-                    area: ['100%', '100%'],
+                    area: ['70%', '70%'],
                     content: page,
                 });
                 $(window).on("resize", function () {

@@ -6,7 +6,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>已发短信一览表</title>
+    <title>历史收信</title>
     <meta name="renderer" content="webkit">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
@@ -58,7 +58,7 @@
 
         table.render({
             elem: '#currentTableId',
-            url: 'Sms_list',
+            url: 'ReceivesmsHistory_list',
             toolbar: '#toolbarDemo',
             defaultToolbar: ['filter', 'exports', 'print', {
                 title: '提示',
@@ -66,7 +66,7 @@
                 icon: 'layui-icon-tips'
             }],
             cols: [[
-                { field: 'sid', width: 200, title: '短信编号', sort: true },
+                { field: 'sid', width: 200, title: '短信编号', sort: true, hide: true},
                 { field: 'tel', width: 200, title: '收信号码'},
                 { field: 'text', width: 400, title: '短信内容'},
                 { title: '操作', minWidth: 150, toolbar: '#currentTableBar', align: "center"}
@@ -75,10 +75,11 @@
             limit: 5,
             text: { none: '无数据' },
             page: true,
-            skin: 'line',
-            done: function () {
-                $("[data-field='sid']").css('display', 'none');
-            }
+            skin: 'line'
+            //done: function ()
+            //{
+            //    $("[data-field='sid']").css('display', 'none');
+            //}
         });
         form.on('submit(data-search-btn)', function (data) {
             //var result = JSON.stringify(data.field);
@@ -113,9 +114,9 @@
 
                 return false;
             }
-			else if (obj.event === 'delete') {
+            else if (obj.event === 'delete') {
                 layer.confirm('真的要删除该短信吗', function (index) {
-                    window.location.href = "DeleteSms?id=" + data.sid+"&from=Sendedsms";
+                    window.location.href = "DeleteSmsHistory?id=" + data.sid.replace(/\+/g, "%2B");
                     obj.del();
                     layer.close(index);
                 });

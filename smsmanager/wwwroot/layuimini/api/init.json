@@ -40,6 +40,12 @@
           "target": "_self"
         },
         {
+          "title": "历史收信",
+          "href": "Home/ReceivesmsHistory",
+          "icon": "fa fa-file-text",
+          "target": "_self"
+        },
+        {
           "title": "邮箱转发",
           "href": "Home/Emailfoward",
           "icon": "fa fa-file-text",
