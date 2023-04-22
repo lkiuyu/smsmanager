@@ -90,8 +90,8 @@
                     curr: 1
                 }
                 , where: {
-                    tel: data.field['tel'] == "" ? "_-" : data.field['tel'],
-                    text: data.field['text'] == "" ? "_-" : data.field['text']
+                    tel: data.field['tel'],
+                    text: data.field['text']
                 }
             }, 'data');
         });

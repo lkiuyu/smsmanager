@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using ModemManager1.DBus;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using smsmanager.Models;
@@ -11,10 +13,13 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml;
+using Tmds.DBus;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace smsmanager.Controllers
 {
@@ -27,28 +32,17 @@ namespace smsmanager.Controllers
             _logger = logger;
             _hostEnvironment = hostEnvironment;
         }
-        public void clear() 
-        {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-        }
-
-        //public HomeController(IWebHostEnvironment hostEnvironment)
-        //{
-        //    _hostEnvironment = hostEnvironment;
-        //}
-        public IActionResult login()
+        public ActionResult login()
         {
             return View();
         }
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult login(User user)
+        public ActionResult login(User user)
         {
             if (user.uname == null || user.upassword == null)
             {
                 ModelState.AddModelError("", "用户名或密码为空");
-                clear();
                 return View(user);
             }
             else
@@ -70,19 +64,17 @@ namespace smsmanager.Controllers
                 if (userJudge)
                 {
                     HttpContext.Session.SetString("uname", user.uname);
-                    clear();
                     return View("Index");
                 }
                 else
                 {
                     ModelState.AddModelError("", "用户名或密码错误，登录失败！");
-                    clear();
                     return View(user);
                 }
 
             }
         }
-        public IActionResult GetLogo()
+        public ActionResult GetLogo()
         {
             var strPath = Path.Combine(_hostEnvironment.WebRootPath, "layuimini/images/logo.png");
             using (var sw = new FileStream(strPath, FileMode.Open))
@@ -91,515 +83,360 @@ namespace smsmanager.Controllers
                 sw.Read(bytes, 0, bytes.Length);
                 sw.Close();
                 sw.Dispose();
-                clear();
+                
                 return new FileContentResult(bytes, "image/png");
             }
         }
-        public IActionResult Welcome()
+        public ActionResult Welcome()
         {
-            var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-list-sms");
-            psi.RedirectStandardOutput = true;
-            using (var process = System.Diagnostics.Process.Start(psi))
+            using (var connection = new Connection(Address.System))
             {
-                var output = process.StandardOutput.ReadToEnd();
-                process.Kill();
-                if (output != string.Empty && output.Trim() != "No sms messages were found")
+                connection.ConnectAsync();
+                var objectPath = new ObjectPath("/org/freedesktop/ModemManager1/Modem/0");
+                var service = "org.freedesktop.ModemManager1";
+                var imsg = connection.CreateProxy<IMessaging>(service, objectPath);
+                var smspathlist=imsg.GetMessagesAsync().Result;
+                int sendcount = 0;
+                int tempcount = 0;
+                int receivecount = 0;
+                foreach (var item in smspathlist)
                 {
-                    //int count = 0;
-                    string[] qline = output.Split(Environment.NewLine.ToCharArray());
-                    int sendcount = 0;
-                    int tempcount = 0;
-                    int receivecount = 0;
-                    for (int i = 0; i < qline.Count() - 1; i++)
+                    ISms isms = connection.CreateProxy<ISms>("org.freedesktop.ModemManager1", item);
+                    if (isms.GetStateAsync().Result.ToString()=="5")
                     {
-                        string[] theRow = qline[i].Split("(");
-                        if (theRow[1].Trim() == "sent)")
-                        {
-                            sendcount++;
-                        }
-                        if (theRow[1].Trim() == "unknown)")
-                        {
-                            tempcount++;
-                        }
-                        if (theRow[1].Trim() == "received)")
-                        {
-                            receivecount++;
-                        }
+                        sendcount++;
                     }
-                    ViewBag.smscount = sendcount+ tempcount+ receivecount;
+                    if (isms.GetStateAsync().Result.ToString() == "3")
+                    {
+                        receivecount++;
+                    }
+                    if (isms.GetStateAsync().Result.ToString() == "0")
+                    {
+                        tempcount++;
+                    }
+                    ViewBag.smscount = sendcount + tempcount + receivecount;
                     ViewBag.sendcount = sendcount;
                     ViewBag.tempcount = tempcount;
                     ViewBag.receivecount = receivecount;
-                    clear();
-                    return View();
-                }
-                else
-                {
-                    ViewBag.smscount = 0;
-                    ViewBag.sendcount = 0;
-                    ViewBag.tempcount = 0;
-                    ViewBag.receivecount = 0;
-                    clear();
-                    return View();
                 }
             }
+            return View();
         }
-        public IActionResult Index()
+        public ActionResult Index()
         {
             if (HttpContext.Session.GetString("uname") == null)
             {
-                clear();
                 return Content("<script type='text/javascript'>alert('登录失效!');window.location.href='login';</script>");
             }
             else
             {
                 string adminname = HttpContext.Session.GetString("uname");
                 ViewBag.name = adminname;
-                clear();
                 return View();
             }
         }
-        public IActionResult LoginOut()
+        public ActionResult LoginOut()
         {
             HttpContext.Session.Clear();
-            clear();
             return RedirectToAction("login");
         }
 
-        public IActionResult Sendedsms()
+        public ActionResult Sendedsms()
         {
-            clear();
             return View();
         }
-        public IActionResult Sms_list(int page, int limit, string tel = "", string text = "")
+
+        public ActionResult Sms_list(actionInputMModel input)
         {
-            if (tel == "_-")
+            using (var connection = new Connection(Address.System))
             {
-                tel = "";
-            }
-            if (text == "_-")
-            {
-                text = "";
-            }
-            var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-list-sms");
-            psi.RedirectStandardOutput = true;
-            using (var process = System.Diagnostics.Process.Start(psi))
-            {
-                var output = process.StandardOutput.ReadToEnd();
-                process.Kill();
-                if (output != string.Empty&& output.Trim() != "No sms messages were found")
+                connection.ConnectAsync();
+                var objectPath = new ObjectPath("/org/freedesktop/ModemManager1/Modem/0");
+                var service = "org.freedesktop.ModemManager1";
+                var imsg = connection.CreateProxy<IMessaging>(service, objectPath);
+                var smspathlist = imsg.GetMessagesAsync().Result;
+                List<Sms> list = new List<Sms>();
+                foreach (var item in smspathlist)
                 {
-                    //int count = 0;
-                    List<Sms> list=new List<Sms>();
-                    string[] qline = output.Split(Environment.NewLine.ToCharArray());
-                    for (int i = 0; i < qline.Count() - 1; i++)
+                    ISms isms = connection.CreateProxy<ISms>("org.freedesktop.ModemManager1", item);
+                    if (isms.GetStateAsync().Result.ToString() == "5")
                     {
-                        string[] theRow = qline[i].Split("(");
-                        if (theRow[1].Trim()== "sent)") 
+                        Sms s = new Sms();
+                        s.sid = item.ToString();
+                        s.tel = isms.GetNumberAsync().Result;
+                        s.text = isms.GetTextAsync().Result;
+                        if (!string.IsNullOrEmpty(input.tel) && !string.IsNullOrEmpty(input.text))
                         {
-                            Sms s = new Sms();
-                            s.sid = theRow[0].Trim().Split("SMS/")[1].ToString().Trim();
-                            var psi2 = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 -s "+ s.sid);
-                            psi2.RedirectStandardOutput = true;
-                            using (var process2 = System.Diagnostics.Process.Start(psi2))
-                            {
-                                var output2 = process2.StandardOutput.ReadToEnd();
-                                process2.Kill();
-                                if (output2 != string.Empty)
-                                {
-                                    string[] qline2 = output2.Split(Environment.NewLine.ToCharArray());
-                                    s.tel = qline2[3].Split("|")[1].Trim().Split(":")[1].Trim();
-                                    s.text = qline2[4].Split("|      text:")[1].Trim();
-                                }
-                            }
-                            if (!string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
-                            {
-                                if (Contains(s.tel, tel) && Contains(s.text, text))
-                                {
-                                    list.Add(s);
-                                }
-                            }
-                            else if (string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
-                            {
-                                if (Contains(s.text, text))
-                                {
-                                    list.Add(s);
-                                }
-                            }
-                            else if (!string.IsNullOrEmpty(tel) && string.IsNullOrEmpty(text))
-                            {
-                                if (Contains(s.tel, tel))
-                                {
-                                    list.Add(s);
-                                }
-                            }
-                            else
+                            if (Contains(s.tel, input.tel) && Contains(s.text, input.text))
                             {
                                 list.Add(s);
                             }
-                            //count++;
+                        }
+                        else if (string.IsNullOrEmpty(input.tel) && !string.IsNullOrEmpty(input.text))
+                        {
+                            if (Contains(s.text, input.text))
+                            {
+                                list.Add(s);
+                            }
+                        }
+                        else if (!string.IsNullOrEmpty(input.tel) && string.IsNullOrEmpty(input.text))
+                        {
+                            if (Contains(s.tel, input.tel))
+                            {
+                                list.Add(s);
+                            }
+                        }
+                        else
+                        {
+                            list.Add(s);
                         }
                     }
-                    var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderByDescending(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList()};//构造出适配layui表格的json格式
-                    //return Json(newdata, JsonRequestBehavior.AllowGet);//转为json并返回至前台
-                     clear();
+                    
+                }
+                if (list.Count!=0)
+                {
+                    var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderByDescending(b => b.sid).Skip((input.page - 1) * input.limit).Take(input.limit).ToList() };//构造出适配layui表格的json格式
                     return Json(newdata);
                 }
                 else
                 {
-                    clear();
                     return Json(new { code = 0, msg = "", count = 0, data = "" });
                 }
             }
-            
         }
-        public IActionResult ViewSms(string tel, string smstext)
+        public ActionResult ViewSms(string tel, string smstext)
         {
             ViewBag.tel = tel;
             ViewBag.smstext = smstext;
-            clear();
             return View(); 
         }
-        public IActionResult DeleteSms(int id,string from)
+        public ActionResult DeleteSms(string id,string from)
         {
-            var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-delete-sms="+ id);
-            psi.RedirectStandardOutput = true;
-            psi.UseShellExecute = false;
-            psi.RedirectStandardError = true;
-            using (var process = System.Diagnostics.Process.Start(psi))
+            using (var connection = new Connection(Address.System))
             {
-                var output = process.StandardOutput.ReadToEnd();
-                var error= process.StandardError.ReadToEnd();
-                process.Kill();
-                if (output.Trim() == "successfully deleted SMS from modem")
-                {
-                    clear();
-                    return RedirectToAction(from);
-                }
-                else if (error.Trim() == "error: couldn't delete SMS: 'GDBus.Error:org.freedesktop.ModemManager1.Error.Core.Failed: Couldn't delete 1 parts from this SMS'")
-                {
-                    doubleDeleteSms(id);
-                    clear();
-                    return RedirectToAction(from);
-                }
-                else
-                {
-                    clear();
-                    return RedirectToAction(from);
-                }
+                connection.ConnectAsync();
+                var objectPath = new ObjectPath("/org/freedesktop/ModemManager1/Modem/0");
+                var smsPath = new ObjectPath(id);
+                var service = "org.freedesktop.ModemManager1";
+                var imsg = connection.CreateProxy<IMessaging>(service, objectPath);
+                imsg.DeleteAsync(smsPath);
             }
+            return RedirectToAction(from);
         }
 
-        public void doubleDeleteSms(int id) 
-        {
-            var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-delete-sms=" + id);
-            psi.RedirectStandardOutput = true;
-            psi.UseShellExecute = false;
-            psi.RedirectStandardError = true;
-            using (var process = System.Diagnostics.Process.Start(psi))
-            {
-                var output = process.StandardOutput.ReadToEnd();
-                var error = process.StandardError.ReadToEnd();
-                process.Kill();
-                if (error.Trim() == "couldn't delete SMS: 'GDBus.Error:org.freedesktop.ModemManager1.Error.Core.Failed: Couldn't delete 1 parts from this SMS'")
-                {
-                    doubleDeleteSms(id);
-                }
-            }
-            clear();
-        }
+        //public void doubleDeleteSms(int id) 
+        //{
+        //    var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-delete-sms=" + id);
+        //    psi.RedirectStandardOutput = true;
+        //    psi.UseShellExecute = false;
+        //    psi.RedirectStandardError = true;
+        //    using (var process = System.Diagnostics.Process.Start(psi))
+        //    {
+        //        var output = process.StandardOutput.ReadToEnd();
+        //        var error = process.StandardError.ReadToEnd();
+        //        process.Kill();
+        //        if (error.Trim() == "couldn't delete SMS: 'GDBus.Error:org.freedesktop.ModemManager1.Error.Core.Failed: Couldn't delete 1 parts from this SMS'")
+        //        {
+        //            doubleDeleteSms(id);
+        //        }
+        //    }
+            
+        //}
 
-        public IActionResult Tempdsms()
+        public ActionResult Tempdsms()
         {
-            clear();
             return View();
         }
-        public IActionResult TempSms_list(int page, int limit, string tel = "", string text = "")
+        public ActionResult TempSms_list(actionInputMModel input)
         {
-            if (tel == "_-")
+            using (var connection = new Connection(Address.System))
             {
-                tel = "";
-            }
-            if (text == "_-")
-            {
-                text = "";
-            }
-            var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-list-sms");
-            psi.RedirectStandardOutput = true;
-            using (var process = System.Diagnostics.Process.Start(psi))
-            {
-                var output = process.StandardOutput.ReadToEnd();
-                process.Kill();
-                if (output != string.Empty && output.Trim() != "No sms messages were found")
+                connection.ConnectAsync();
+                var objectPath = new ObjectPath("/org/freedesktop/ModemManager1/Modem/0");
+                var service = "org.freedesktop.ModemManager1";
+                var imsg = connection.CreateProxy<IMessaging>(service, objectPath);
+                var smspathlist = imsg.GetMessagesAsync().Result;
+                List<Sms> list = new List<Sms>();
+                foreach (var item in smspathlist)
                 {
-                    //int count = 0;
-                    List<Sms> list = new List<Sms>();
-                    string[] qline = output.Split(Environment.NewLine.ToCharArray());
-                    for (int i = 0; i < qline.Count() - 1; i++)
+                    ISms isms = connection.CreateProxy<ISms>("org.freedesktop.ModemManager1", item);
+                    if (isms.GetStateAsync().Result.ToString() == "0")
                     {
-                        string[] theRow = qline[i].Split("(");
-                        if (theRow[1].Trim() == "unknown)")
+                        Sms s = new Sms();
+                        s.sid = item.ToString();
+                        s.tel = isms.GetNumberAsync().Result;
+                        s.text = isms.GetTextAsync().Result;
+                        if (!string.IsNullOrEmpty(input.tel) && !string.IsNullOrEmpty(input.text))
                         {
-                            Sms s = new Sms();
-                            s.sid = theRow[0].Trim().Split("SMS/")[1].ToString().Trim();
-                            var psi2 = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 -s " + s.sid);
-                            psi2.RedirectStandardOutput = true;
-                            using (var process2 = System.Diagnostics.Process.Start(psi2))
-                            {
-                                var output2 = process2.StandardOutput.ReadToEnd();
-                                process2.Kill();
-                                if (output2 != string.Empty)
-                                {
-                                    string[] qline2 = output2.Split(Environment.NewLine.ToCharArray());
-                                    s.tel = qline2[3].Split("|")[1].Trim().Split(":")[1].Trim();
-                                    s.text = qline2[4].Split("|      text:")[1].Trim();
-                                }
-                            }
-                            if (!string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
-                            {
-                                if (Contains(s.tel, tel) && Contains(s.text, text))
-                                {
-                                    list.Add(s);
-                                }
-                            }
-                            else if (string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
-                            {
-                                if (Contains(s.text, text))
-                                {
-                                    list.Add(s);
-                                }
-                            }
-                            else if (!string.IsNullOrEmpty(tel) && string.IsNullOrEmpty(text))
-                            {
-                                if (Contains(s.tel, tel))
-                                {
-                                    list.Add(s);
-                                }
-                            }
-                            else
+                            if (Contains(s.tel, input.tel) && Contains(s.text, input.text))
                             {
                                 list.Add(s);
                             }
-                            //count++;
+                        }
+                        else if (string.IsNullOrEmpty(input.tel) && !string.IsNullOrEmpty(input.text))
+                        {
+                            if (Contains(s.text, input.text))
+                            {
+                                list.Add(s);
+                            }
+                        }
+                        else if (!string.IsNullOrEmpty(input.tel) && string.IsNullOrEmpty(input.text))
+                        {
+                            if (Contains(s.tel, input.tel))
+                            {
+                                list.Add(s);
+                            }
+                        }
+                        else
+                        {
+                            list.Add(s);
                         }
                     }
-                    var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderByDescending(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList() };//构造出适配layui表格的json格式
-                    //return Json(newdata, JsonRequestBehavior.AllowGet);//转为json并返回至前台
-                     clear();
+
+                }
+                if (list.Count != 0)
+                {
+                    var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderByDescending(b => b.sid).Skip((input.page - 1) * input.limit).Take(input.limit).ToList() };//构造出适配layui表格的json格式
                     return Json(newdata);
                 }
                 else
                 {
-                    clear();
                     return Json(new { code = 0, msg = "", count = 0, data = "" });
                 }
             }
-
         }
-        public IActionResult EditSms(int id, string tel, string smstext)
+        public ActionResult EditSms(string id, string tel, string smstext)
         {
             ViewBag.sid = id;
             ViewBag.tel = tel;
             ViewBag.smstext = smstext;
-            clear();
             return View();
         }
         [HttpPost]
-        public IActionResult EditingSms(int id,string tel, string text)
+        public ActionResult EditingSms(string id, string tel, string text)
         {
-            var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-delete-sms=" + id);
-            psi.RedirectStandardOutput = true;
-            using (var process = System.Diagnostics.Process.Start(psi))
+            using (var connection = new Connection(Address.System))
             {
-                var output = process.StandardOutput.ReadToEnd();
-                process.Kill();
-                if (output.Trim() == "successfully deleted SMS from modem")
-                {
-                    var psi1 = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-create-sms=\"text ='" + text + "', number = '" + Regex.Replace(tel, @"\s", "") + "'\"");
-                    psi1.RedirectStandardOutput = true;
-                    using (var process1 = System.Diagnostics.Process.Start(psi1))
-                    {
-                        var output1 = process1.StandardOutput.ReadToEnd();
-                        process1.Kill();
-                        if (output1.Split(":")[0].Trim() == "Successfully created new SMS")
-                        {
-                            ViewBag.js = "<script type='text/javascript'>alert('修改成功！');layui.use(['form'], function() {var form = layui.form,layer = layui.layer,$ = layui.$;function close(){var iframeIndex = parent.layer.getFrameIndex(window.name);parent.layer.close(iframeIndex);window.parent.location.reload();}close();});</script>";
-                            clear();
-                            return View("EditSms");
-                        }
-                        else
-                        {
-                            ViewBag.js = "<script type='text/javascript'>alert('修改失败！');layui.use(['form'], function() {var form = layui.form,layer = layui.layer,$ = layui.$;function close(){var iframeIndex = parent.layer.getFrameIndex(window.name);parent.layer.close(iframeIndex);window.parent.location.reload();}close();});</script>";
-                            clear();
-                            return View("EditSms");
-                        }
-                    }
-                }
-                else
-                {
-                    ViewBag.js = "<script type='text/javascript'>alert('修改失败！');layui.use(['form'], function() {var form = layui.form,layer = layui.layer,$ = layui.$;function close(){var iframeIndex = parent.layer.getFrameIndex(window.name);parent.layer.close(iframeIndex);window.parent.location.reload();}close();});</script>";
-                    clear();
-                    return View();
-                }
+                connection.ConnectAsync();
+                var objectPath = new ObjectPath("/org/freedesktop/ModemManager1/Modem/0");
+                var service = "org.freedesktop.ModemManager1";
+                var imsg = connection.CreateProxy<IMessaging>(service, objectPath);
+                var smsPath = new ObjectPath(id);
+                imsg.DeleteAsync(smsPath);
+                Dictionary<string, object> smsdict = new Dictionary<string, object> { { "text", text }, { "number", tel } };
+                var sendsmsPath = imsg.CreateAsync(smsdict).Result;
+                ViewBag.js = "<script type='text/javascript'>alert('修改成功！');layui.use(['form'], function() {var form = layui.form,layer = layui.layer,$ = layui.$;function close(){var iframeIndex = parent.layer.getFrameIndex(window.name);parent.layer.close(iframeIndex);window.parent.location.reload();}close();});</script>";
+                return View("EditSms");
             }
         }
-        public IActionResult SendSms(int id)
+        public ActionResult SendSms(string id)
         {
-            var psi = new System.Diagnostics.ProcessStartInfo("mmcli", "-s " + id + " --send");
-            psi.RedirectStandardOutput = true;
-            using (var process = System.Diagnostics.Process.Start(psi))
+            using (var connection = new Connection(Address.System))
             {
-                var output = process.StandardOutput.ReadToEnd();
-                process.Kill();
-                if (output.Trim() == "successfully sent the SMS")
-                {
-                    clear();
-                    return RedirectToAction("Sendedsms");
-                }
-                else
-                {
-                    clear();
-                    return RedirectToAction("Tempdsms");
-                }
+                connection.ConnectAsync();
+                var smsPath = new ObjectPath(id);
+                var isms = connection.CreateProxy<ISms>("org.freedesktop.ModemManager1", smsPath);
+                isms.SendAsync().Wait();
+                return RedirectToAction("Tempdsms");
             }
         }
         [HttpPost]
-        public IActionResult TempSaveSms(string tel, string text)
+        public ActionResult TempSaveSms(string tel, string text)
         {
-            var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-create-sms=\"text ='" + text + "', number = '" + Regex.Replace(tel, @"\s", "") + "'\"");
-            psi.RedirectStandardOutput = true;
-            using (var process = System.Diagnostics.Process.Start(psi))
+            using (var connection = new Connection(Address.System))
             {
-                var output = process.StandardOutput.ReadToEnd();
-                process.Kill();
-                if (output.Split(":")[0].Trim() == "Successfully created new SMS")
-                {
-                    clear();
-                    return RedirectToAction("Tempdsms");
-                }
-                else
-                {
-                    clear();
-                    return RedirectToAction("SendingSms");
-                }
+                connection.ConnectAsync();
+                var objectPath = new ObjectPath("/org/freedesktop/ModemManager1/Modem/0");
+                var service = "org.freedesktop.ModemManager1";
+                var imsg = connection.CreateProxy<IMessaging>(service, objectPath);
+                Dictionary<string, object> smsdict = new Dictionary<string, object> { { "text", text }, { "number", tel } };
+                var sendsmsPath = imsg.CreateAsync(smsdict).Result;
+                return RedirectToAction("Tempdsms");
             }
         }
-        public IActionResult SendingSms()
+        public ActionResult SendingSms()
         {
-            clear();
             return View(); 
         }
         [HttpPost]
-        public IActionResult SendingSms(string tel,string text)
+        public ActionResult SendingSms(string tel,string text)
         {
-            var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-create-sms=\"text ='"+ text + "', number = '"+ Regex.Replace(tel, @"\s", "") + "'\"");
-            psi.RedirectStandardOutput = true;
-            using (var process = System.Diagnostics.Process.Start(psi))
+
+            using (var connection = new Connection(Address.System))
             {
-                var output = process.StandardOutput.ReadToEnd();
-                process.Kill();
-                if (output.Split(":")[0].Trim() == "Successfully created new SMS")
-                {
-                    string sid = output.Split(":")[1].Split("SMS/")[1].Trim();
-                    SendSms(Convert.ToInt32(sid));
-                    clear();
-                    return View("Sendedsms");
-                }
-                else
-                {
-                    ViewBag.js = "<script>alert('发送失败！');</script>";
-                    clear();
-                    return View("SendingSms");
-                }
+                connection.ConnectAsync();
+                var objectPath = new ObjectPath("/org/freedesktop/ModemManager1/Modem/0");
+                var service = "org.freedesktop.ModemManager1";
+                var imsg = connection.CreateProxy<IMessaging>(service, objectPath);
+                Dictionary<string, object> smsdict = new Dictionary<string, object> { { "text", text }, { "number", tel } };
+                var sendsmsPath = imsg.CreateAsync(smsdict).Result;
+                var isms = connection.CreateProxy<ISms>("org.freedesktop.ModemManager1", sendsmsPath);
+                isms.SendAsync().Wait();
+                return View("Sendedsms");
             }
         }
-        public IActionResult Receivesms()
+        public ActionResult Receivesms()
         {
-            clear();
             return View();
         }
-        public IActionResult ReceiveSms_list(int page, int limit, string tel = "", string text = "")
+        public ActionResult ReceiveSms_list(actionInputMModel input)
         {
-            if (tel == "_-")
+            using (var connection = new Connection(Address.System))
             {
-                tel = "";
-            }
-            if (text == "_-")
-            {
-                text = "";
-            }
-            var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-list-sms");
-            psi.RedirectStandardOutput = true;
-            using (var process = System.Diagnostics.Process.Start(psi))
-            {
-                var output = process.StandardOutput.ReadToEnd();
-                process.Kill();
-                if (output != string.Empty && output.Trim() != "No sms messages were found")
+                connection.ConnectAsync();
+                var objectPath = new ObjectPath("/org/freedesktop/ModemManager1/Modem/0");
+                var service = "org.freedesktop.ModemManager1";
+                var imsg = connection.CreateProxy<IMessaging>(service, objectPath);
+                var smspathlist = imsg.GetMessagesAsync().Result;
+                List<Sms> list = new List<Sms>();
+                foreach (var item in smspathlist)
                 {
-                    //int count = 0;
-                    List<Sms> list = new List<Sms>();
-                    string[] qline = output.Split(Environment.NewLine.ToCharArray());
-                    for (int i = 0; i < qline.Count() - 1; i++)
+                    ISms isms = connection.CreateProxy<ISms>("org.freedesktop.ModemManager1", item);
+                    if (isms.GetStateAsync().Result.ToString() == "3")
                     {
-                        string[] theRow = qline[i].Split("(");
-                        if (theRow[1].Trim() == "received)")
+                        Sms s = new Sms();
+                        s.sid = item.ToString();
+                        s.tel = isms.GetNumberAsync().Result;
+                        s.text = isms.GetTextAsync().Result;
+                        if (!string.IsNullOrEmpty(input.tel) && !string.IsNullOrEmpty(input.text))
                         {
-                            Sms s = new Sms();
-                            s.sid = theRow[0].Trim().Split("SMS/")[1].ToString().Trim();
-                            var psi2 = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 -s " + s.sid);
-                            psi2.RedirectStandardOutput = true;
-                            using (var process2 = System.Diagnostics.Process.Start(psi2))
-                            {
-                                var output2 = process2.StandardOutput.ReadToEnd();
-                                process2.Kill();
-                                if (output2 != string.Empty)
-                                {
-                                    string[] qline2 = output2.Split(Environment.NewLine.ToCharArray());
-                                    s.tel = qline2[3].Split("|")[1].Trim().Split(":")[1].Trim();
-                                    s.text = qline2[4].Split("|      text:")[1].Trim();
-                                }
-                            }
-                            if (!string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
-                            {
-                                if (Contains(s.tel, tel) && Contains(s.text, text))
-                                {
-                                    list.Add(s);
-                                }
-                            }
-                            else if (string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
-                            {
-                                if (Contains(s.text, text))
-                                {
-                                    list.Add(s);
-                                }
-                            }
-                            else if (!string.IsNullOrEmpty(tel) && string.IsNullOrEmpty(text))
-                            {
-                                if (Contains(s.tel, tel))
-                                {
-                                    list.Add(s);
-                                }
-                            }
-                            else
+                            if (Contains(s.tel, input.tel) && Contains(s.text, input.text))
                             {
                                 list.Add(s);
                             }
-                            //count++;
+                        }
+                        else if (string.IsNullOrEmpty(input.tel) && !string.IsNullOrEmpty(input.text))
+                        {
+                            if (Contains(s.text, input.text))
+                            {
+                                list.Add(s);
+                            }
+                        }
+                        else if (!string.IsNullOrEmpty(input.tel) && string.IsNullOrEmpty(input.text))
+                        {
+                            if (Contains(s.tel, input.tel))
+                            {
+                                list.Add(s);
+                            }
+                        }
+                        else
+                        {
+                            list.Add(s);
                         }
                     }
-                    var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderByDescending(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList() };//构造出适配layui表格的json格式
-                                                                                                                                                                //return Json(newdata, JsonRequestBehavior.AllowGet);//转为json并返回至前台
-                    clear();
+                }
+                if (list.Count != 0)
+                {
+                    var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderByDescending(b => b.sid).Skip((input.page - 1) * input.limit).Take(input.limit).ToList() };//构造出适配layui表格的json格式
                     return Json(newdata);
                 }
                 else
                 {
-                    clear();
                     return Json(new { code = 0, msg = "", count = 0, data = "" });
                 }
             }
         }
-        public IActionResult DeleteSmsHistory(string id)
+        public ActionResult DeleteSmsHistory(string id)
         {
             string smssavedPath = AppDomain.CurrentDomain.BaseDirectory + "smssaved.json";
             StreamReader file = new StreamReader(smssavedPath, Encoding.Default);
@@ -614,10 +451,12 @@ namespace smsmanager.Controllers
                 {
                     if (item.sid!= id)
                     {
-                        JObject jobj = new JObject();
-                        jobj.Add("sid", item.sid);
-                        jobj.Add("tel", item.tel);
-                        jobj.Add("text", item.text);
+                        JObject jobj = new JObject
+                        {
+                            { "sid", item.sid },
+                            { "tel", item.tel },
+                            { "text", item.text }
+                        };
                         ja.Add(jobj);
                     }
                 }
@@ -630,32 +469,21 @@ namespace smsmanager.Controllers
                         sw.Write(ja.ToString());
                     }
                 }
-                clear();
                 return RedirectToAction("ReceivesmsHistory");
             }
             else
             {
-                clear();
                 return RedirectToAction("ReceivesmsHistory");
             }
 
         }
 
-        public IActionResult ReceivesmsHistory()
+        public ActionResult ReceivesmsHistory()
         {
-            clear();
             return View();
         }
-        public IActionResult ReceivesmsHistory_list(int page, int limit,string tel="",string text="")
+        public ActionResult ReceivesmsHistory_list(actionInputMModel input)
         {
-            if (tel=="_-")
-            {
-                tel = "";
-            }
-            if (text == "_-")
-            {
-                text = "";
-            }
             string smssavedPath = AppDomain.CurrentDomain.BaseDirectory + "smssaved.json";
             StreamReader file = new StreamReader(smssavedPath, Encoding.Default);
             string jsonstring = file.ReadToEnd();
@@ -667,23 +495,23 @@ namespace smsmanager.Controllers
                 Sms[] datas = JsonConvert.DeserializeObject<Sms[]>(jsonstring);
                 foreach (Sms item in datas)
                 {
-                    if (!string.IsNullOrEmpty(tel)&& !string.IsNullOrEmpty(text))
+                    if (!string.IsNullOrEmpty(input.tel) && !string.IsNullOrEmpty(input.text))
                     {
-                        if (Contains(item.tel, tel)&& Contains(item.text, text))
+                        if (Contains(item.tel, input.tel)&& Contains(item.text, input.text))
                         {
                             list.Add(item);
                         }
                     }
-                    else if (string.IsNullOrEmpty(tel) && !string.IsNullOrEmpty(text))
+                    else if (string.IsNullOrEmpty(input.tel) && !string.IsNullOrEmpty(input.text))
                     {
-                        if (Contains(item.text, text))
+                        if (Contains(item.text, input.text))
                         {
                             list.Add(item);
                         }
                     }
-                    else if (!string.IsNullOrEmpty(tel) && string.IsNullOrEmpty(text))
+                    else if (!string.IsNullOrEmpty(input.tel) && string.IsNullOrEmpty(input.text))
                     {
-                        if (Contains(item.tel, tel))
+                        if (Contains(item.tel, input.tel))
                         {
                             list.Add(item);
                         }
@@ -692,20 +520,17 @@ namespace smsmanager.Controllers
                     {
                         list.Add(item);
                     }
-
                 }
-                var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderByDescending(b => b.sid).Skip((page - 1) * limit).Take(limit).ToList() };//构造出适配layui表格的json格式                                                                                                                                        //return Json(newdata, JsonRequestBehavior.AllowGet);//转为json并返回至前台
-                clear();
+                var newdata = new { code = 0, msg = "", count = list.Count, data = list.OrderByDescending(b => b.sid).Skip((input.page - 1) * input.limit).Take(input.limit).ToList() };//构造出适配layui表格的json格式                                                                                                                                        //return Json(newdata, JsonRequestBehavior.AllowGet);//转为json并返回至前台
                 return Json(newdata);
             }
             else
             {
-                clear();
                 return Json(new { code = 0, msg = "", count = 0, data = "" });
             }
         }
 
-        public IActionResult Emailfoward()
+        public ActionResult Emailfoward()
         {
             string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
             XmlDocument xmldoc = new XmlDocument();
@@ -720,11 +545,10 @@ namespace smsmanager.Controllers
                 ViewBag.sendEmial = element.GetElementsByTagName("sendEmial")[0].InnerText;
                 ViewBag.reciveEmial = element.GetElementsByTagName("reciveEmial")[0].InnerText;
             }
-            clear();
             return View();
         }
         [HttpPost]
-        public IActionResult EmailfowardStatusChange(string kg, string smtp,string smtpport, string key, string sendEmial, string reciveEmial)
+        public ActionResult EmailfowardStatusChange(string kg, string smtp,string smtpport, string key, string sendEmial, string reciveEmial)
         {
             string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
             XmlDocument MyXml = new XmlDocument();
@@ -742,7 +566,6 @@ namespace smsmanager.Controllers
                 element.GetElementsByTagName("reciveEmial")[0].InnerText = reciveEmial;
             }
             MyXml.Save(orgCodePath);
-
             foreach (XmlElement element in topM)
             {
                 ViewBag.status = element.GetElementsByTagName("emailFowardStatus")[0].InnerText == "0" ? "" : "checked=\"\"";
@@ -752,11 +575,10 @@ namespace smsmanager.Controllers
                 ViewBag.sendEmial = element.GetElementsByTagName("sendEmial")[0].InnerText;
                 ViewBag.reciveEmial = element.GetElementsByTagName("reciveEmial")[0].InnerText;
             }
-            clear();
             return View("Emailfoward");
         }
 
-        public IActionResult Wechatfoward()
+        public ActionResult Wechatfoward()
         {
             string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
             XmlDocument xmldoc = new XmlDocument();
@@ -769,11 +591,10 @@ namespace smsmanager.Controllers
                 ViewBag.apid = element.GetElementsByTagName("WeChatQYApplicationID")[0].InnerText;
                 ViewBag.ApplicationSecret = element.GetElementsByTagName("WeChatQYApplicationSecret")[0].InnerText;
             }
-            clear();
             return View();
         }
         [HttpPost]
-        public IActionResult WechatfowardStatusChange(string kg, string qyid, string apid,string ApplicationSecret)
+        public ActionResult WechatfowardStatusChange(string kg, string qyid, string apid,string ApplicationSecret)
         {
             string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
             XmlDocument MyXml = new XmlDocument();
@@ -789,7 +610,6 @@ namespace smsmanager.Controllers
                 element.GetElementsByTagName("WeChatQYApplicationSecret")[0].InnerText = ApplicationSecret;
             }
             MyXml.Save(orgCodePath);
-
             foreach (XmlElement element in topM)
             {
                 ViewBag.status = element.GetElementsByTagName("WeChatQYFowardStatus")[0].InnerText == "0" ? "" : "checked=\"\"";
@@ -797,20 +617,17 @@ namespace smsmanager.Controllers
                 ViewBag.apid = element.GetElementsByTagName("WeChatQYApplicationID")[0].InnerText;
                 ViewBag.ApplicationSecret = element.GetElementsByTagName("WeChatQYApplicationSecret")[0].InnerText;
             }
-            clear();
             return View("Wechatfoward");
         }
 
-        public IActionResult EditPwd()
+        public ActionResult EditPwd()
         {
             if (HttpContext.Session.GetString("uname") == null)
             {
-                clear();
                 return Content("<script type='text/javascript'>alert('登录失效!');window.location.href='login';</script>");
             }
             else
             {
-                clear();
                 return View();
             }
         }
@@ -822,27 +639,23 @@ namespace smsmanager.Controllers
         /// <param name="againnapwd">重复的新密码</param>
         /// <returns></returns>
         [HttpPost]
-        public IActionResult EditPwd(string oapwd, string napwd, string againnapwd)
+        public ActionResult EditPwd(string oapwd, string napwd, string againnapwd)
         {
             if (HttpContext.Session.GetString("uname") == null)
             {
-                clear();
                 return Content("<script type='text/javascript'>alert('登录失效!');window.location.href='login';</script>");
             }
             else
             {
                 string adminname = HttpContext.Session.GetString("uname");
-
                 if (oapwd.Trim() == "" || napwd.Trim() == "" || againnapwd.Trim() == "")//判断是否为空
                 {
                     ViewBag.js = "<script>alert('新密码或旧密码为空！');</script>";
-                    clear();
                     return View();
                 }
                 else if (napwd != againnapwd)//判断两次新密码是否一致
                 {
                     ViewBag.js = "<script>alert('新密码两次输入不一致！');</script>";
-                    clear();
                     return View();
                 }
                 else
@@ -865,13 +678,11 @@ namespace smsmanager.Controllers
                         }
                         xmldoc.Save(orgCodePath);
                         ViewBag.js = "<script type='text/javascript'>alert('修改成功！');layui.use(['form'], function() {var form = layui.form,layer = layui.layer;function close(){var iframeIndex = parent.layer.getFrameIndex(window.name);parent.layer.close(iframeIndex);window.parent.location.replace('LoginOut');}close();});</script>";
-                        clear();
                         return View();
                     }
                     else
                     {
                         ViewBag.js = "<script>alert('旧的密码输入错误！');</script>";
-                        clear();
                         return View();
                     }
                 }
@@ -879,13 +690,11 @@ namespace smsmanager.Controllers
         }
         public bool Contains(string source, string toCheck)
         {
-            clear();
             return source.IndexOf(toCheck, StringComparison.OrdinalIgnoreCase) >= 0;
         }
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-        public IActionResult Error()
+        public ActionResult Error()
         {
-            clear();
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
     }

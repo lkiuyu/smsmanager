@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
+using smsmanagers;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -22,11 +23,11 @@ namespace smsmanager
         public static void Main(string[] args)
         {
             var host = CreateHostBuilder(args).Build();
-            //Thread email = new Thread(new ThreadStart(emailForward));
-            //email.Start();
             isXmlExist();
+            Thread email = new Thread(new ThreadStart(smsForward.smsTextForward));
+            email.Start();
             //Task.Run(() => emailForward());
-            smsFowardingJobScheduler.Start().GetAwaiter();
+            //smsFowardingJobScheduler.Start().GetAwaiter();
             host.Run();
         }
 
@@ -75,7 +76,6 @@ namespace smsmanager
             node.InnerText = value;
             parentNode.AppendChild(node);
         }
-
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
