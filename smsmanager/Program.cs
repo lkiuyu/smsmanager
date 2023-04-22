@@ -22,8 +22,8 @@ namespace smsmanager
     {
         public static void Main(string[] args)
         {
-            var host = CreateHostBuilder(args).Build();
             isXmlExist();
+            var host = CreateHostBuilder(args).Build();
             Thread email = new Thread(new ThreadStart(smsForward.smsTextForward));
             email.Start();
             //Task.Run(() => emailForward());
@@ -41,6 +41,7 @@ namespace smsmanager
                 //创建根节点  
                 XmlNode root = xmlDoc.CreateElement("userSettings");
                 xmlDoc.AppendChild(root);
+                CreateNode(xmlDoc, root, "urlport", "8080");
                 CreateNode(xmlDoc, root, "username", "admin");
                 CreateNode(xmlDoc, root, "password", "admin");
                 CreateNode(xmlDoc, root, "emailFowardStatus", "0");
@@ -81,7 +82,31 @@ namespace smsmanager
             Host.CreateDefaultBuilder(args)
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
-                    webBuilder.UseUrls("http://*:8080");
+                    string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
+                    XmlDocument xmldoc = new XmlDocument();
+                    xmldoc.Load(orgCodePath);
+                    XmlNodeList topM = xmldoc.SelectNodes("//userSettings");
+                    foreach (XmlElement element in topM)
+                    {
+                        try
+                        {
+                            string urlport = element.GetElementsByTagName("urlport")[0].InnerText;
+                            if (!string.IsNullOrEmpty(urlport))
+                            {
+                                webBuilder.UseUrls("http://*:" + urlport);
+                            }
+                            else
+                            {
+                                webBuilder.UseUrls("http://*:8080");
+                            }
+                        }
+                        catch(Exception e)
+                        {
+                            Console.WriteLine($"Error: {e.Message}");
+                            Console.WriteLine("已使用默认端口8080，请检查配置文件内的端口是否填写正确");
+                            webBuilder.UseUrls("http://*:8080");
+                        }
+                    }
                     webBuilder.UseStartup<Startup>();
                 });
     }
