@@ -72,7 +72,13 @@ namespace smsmanagers
                                  string sid = change.path.ToString();
                                  string tel = await isms.GetNumberAsync();
                                  string stime = (await isms.GetTimestampAsync()).Replace("T", " ").Replace("+08:00", " ");
-                                 string smscontent = await isms.GetTextAsync();
+
+                                 string smscontent = "";
+                                 do
+                                 {
+                                     smscontent = "";
+                                     smscontent = await isms.GetTextAsync();
+                                 } while (string.IsNullOrEmpty(smscontent));
                                  string body = "发信电话:" + tel + "\n" + "时间:" + stime + "\n" + "短信内容:" + smscontent;
                                  Console.WriteLine(body);
                                  if (status == "1")
