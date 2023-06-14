@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
+	<RuntimeIdentifiers>linux-musl-arm64</RuntimeIdentifiers>
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>disable</Nullable>
   </PropertyGroup>

@@ -56,6 +56,18 @@
           "href": "Home/Wechatfoward",
           "icon": "fa fa-file-text",
           "target": "_self"
+        },
+        {
+          "title": "PushPlus转发",
+          "href": "Home/PushPlusfoward",
+          "icon": "fa fa-file-text",
+          "target": "_self"
+        },
+        {
+          "title": "TGBot转发",
+          "href": "Home/TGBotfoward",
+          "icon": "fa fa-file-text",
+          "target": "_self"
         }
       ]
     }

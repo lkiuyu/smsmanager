@@ -54,6 +54,12 @@ namespace smsmanager
                 CreateNode(xmlDoc, root, "WeChatQYID", "");
                 CreateNode(xmlDoc, root, "WeChatQYApplicationID", "");
                 CreateNode(xmlDoc, root, "WeChatQYApplicationSecret", "");
+                CreateNode(xmlDoc, root, "pushPlusFowardStatus", "0");
+                CreateNode(xmlDoc, root, "pushPlusToken", "");
+                CreateNode(xmlDoc, root, "tgBotFowardStatus", "0");
+                CreateNode(xmlDoc, root, "tgBotToken", "");
+                CreateNode(xmlDoc, root, "tgBotChatID", "");
+
                 try
                 {
                     xmlDoc.Save(orgCodePath);

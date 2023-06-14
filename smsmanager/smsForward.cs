@@ -26,8 +26,6 @@ namespace smsmanagers
             string smssavedPath = AppDomain.CurrentDomain.BaseDirectory + "smssaved.json";
             if (File.Exists(orgCodePath)&& File.Exists(smssavedPath))
             {
-                
-                
                 Task.Run(async () =>
                 {
                     using (var connection = new Connection(Address.System))
@@ -43,6 +41,8 @@ namespace smsmanagers
                              {
                                  string status = "";
                                  string qystatus = "";
+                                 string ppstatus = "";
+                                 string tgbotStatus = "";
                                  string smtpHost = "";
                                  string smtpPort = "";
                                  string emailKey = "";
@@ -51,6 +51,9 @@ namespace smsmanagers
                                  string corpid = "";
                                  string corpsecret = "";
                                  string agentid = "";
+                                 string pptoken = "";
+                                 string tgbToken = "";
+                                 string tgbChatID = "";
                                  XmlDocument xmldoc = new XmlDocument();
                                  xmldoc.Load(orgCodePath);
                                  XmlNodeList topM = xmldoc.SelectNodes("//userSettings");
@@ -58,6 +61,8 @@ namespace smsmanagers
                                  {
                                      status = element.GetElementsByTagName("emailFowardStatus")[0].InnerText;
                                      qystatus = element.GetElementsByTagName("WeChatQYFowardStatus")[0].InnerText;
+                                     ppstatus = element.GetElementsByTagName("pushPlusFowardStatus")[0].InnerText;
+                                     tgbotStatus = element.GetElementsByTagName("tgBotFowardStatus")[0].InnerText;
                                      smtpHost = element.GetElementsByTagName("smtpHost")[0].InnerText;
                                      smtpPort = element.GetElementsByTagName("smtpPort")[0].InnerText;
                                      emailKey = element.GetElementsByTagName("emailKey")[0].InnerText;
@@ -66,6 +71,10 @@ namespace smsmanagers
                                      corpid = element.GetElementsByTagName("WeChatQYID")[0].InnerText;
                                      corpsecret = element.GetElementsByTagName("WeChatQYApplicationSecret")[0].InnerText;
                                      agentid = element.GetElementsByTagName("WeChatQYApplicationID")[0].InnerText;
+                                     pptoken = element.GetElementsByTagName("pushPlusToken")[0].InnerText;
+                                     tgbToken = element.GetElementsByTagName("tgBotToken")[0].InnerText;
+                                     tgbChatID = element.GetElementsByTagName("tgBotChatID")[0].InnerText;
+
                                  }
 
                                  var isms = connection.CreateProxy<ISms>("org.freedesktop.ModemManager1", change.path);
@@ -155,6 +164,59 @@ namespace smsmanagers
                                          Console.WriteLine(ex.Message);
                                          Console.WriteLine("出错了，尝试确认下配置文件中的邮箱信息是否正确");
                                      }
+                                 }
+                                 if (ppstatus=="1")
+                                 {
+                                     try
+                                     {
+                                         string pushPlusUrl = "http://www.pushplus.plus/send/";
+                                         JObject obj = new JObject();
+                                         obj.Add("token", pptoken);
+                                         obj.Add("title", "短信转发" + tel);
+                                         obj.Add("content", body);
+                                         obj.Add("topic", "");
+                                         string msgresult = HttpHelper.Post(pushPlusUrl, obj);
+                                         JObject jsonObjresult = JObject.Parse(msgresult);
+                                         string code = jsonObjresult["code"].ToString();
+                                         string errmsg = jsonObjresult["msg"].ToString();
+                                         if (code == "200")
+                                         {
+                                             Console.WriteLine("pushplus转发成功");
+                                         }
+                                         else
+                                         {
+                                             Console.WriteLine(errmsg);
+                                         }
+                                     }
+                                     catch (Exception ex)
+                                     {
+                                         Console.WriteLine(ex.Message);
+                                     }
+                                 }
+                                 if (tgbotStatus=="1")
+                                 {
+                                     try
+                                     {
+                                         string url = "https://api.telegram.org/bot" + tgbToken + "/sendMessage?chat_id=" + tgbChatID + "&text=";
+                                         url += System.Web.HttpUtility.UrlEncode(body);
+                                         string msgresult = HttpHelper.HttpGet(url);
+                                         JObject jsonObjresult = JObject.Parse(msgresult);
+                                         string tgstatus = jsonObjresult["ok"].ToString();
+                                         if (tgstatus == "True")
+                                         {
+                                             Console.WriteLine("TGBot转发成功");
+                                         }
+                                         else
+                                         {
+                                             Console.WriteLine(jsonObjresult["error_code"].ToString());
+                                             Console.WriteLine(jsonObjresult["description"].ToString());
+                                         }
+                                     }
+                                     catch (Exception ex)
+                                     {
+                                         Console.WriteLine(ex.Message);
+                                     }
+                                     
                                  }
 
                                  JArray ja = new JArray();

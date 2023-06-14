@@ -620,6 +620,85 @@ namespace smsmanager.Controllers
             return View("Wechatfoward");
         }
 
+        public ActionResult PushPlusfoward()
+        {
+            string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
+            XmlDocument xmldoc = new XmlDocument();
+            xmldoc.Load(orgCodePath);
+            XmlNodeList topM = xmldoc.SelectNodes("//userSettings");
+            foreach (XmlElement element in topM)
+            {
+                ViewBag.status = element.GetElementsByTagName("pushPlusFowardStatus")[0].InnerText == "0" ? "" : "checked=\"\"";
+                ViewBag.pptoken = element.GetElementsByTagName("pushPlusToken")[0].InnerText;
+            }
+            return View();
+        }
+        [HttpPost]
+        public ActionResult PushPlusStatusChange(string kg, string pptoken)
+        {
+            string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
+            XmlDocument MyXml = new XmlDocument();
+            MyXml.Load(orgCodePath);
+            //获取<Rule>节点的所有子节点
+            XmlNodeList topM = MyXml.SelectNodes("//userSettings");
+            //遍历<Rule>下的所有子节点
+            foreach (XmlElement element in topM)
+            {
+                element.GetElementsByTagName("pushPlusFowardStatus")[0].InnerText = kg == "false" ? "0" : "1";
+                element.GetElementsByTagName("pushPlusToken")[0].InnerText = pptoken;
+                
+            }
+            MyXml.Save(orgCodePath);
+            foreach (XmlElement element in topM)
+            {
+                ViewBag.status = element.GetElementsByTagName("pushPlusFowardStatus")[0].InnerText == "0" ? "" : "checked=\"\"";
+                ViewBag.pptoken = element.GetElementsByTagName("pushPlusToken")[0].InnerText;
+            }
+            return View("PushPlusfoward");
+        }
+        public ActionResult TGBotfoward()
+        {
+            string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
+            XmlDocument xmldoc = new XmlDocument();
+            xmldoc.Load(orgCodePath);
+            XmlNodeList topM = xmldoc.SelectNodes("//userSettings");
+            foreach (XmlElement element in topM)
+            {
+                ViewBag.status = element.GetElementsByTagName("tgBotFowardStatus")[0].InnerText == "0" ? "" : "checked=\"\"";
+                ViewBag.tgbToken = element.GetElementsByTagName("tgBotToken")[0].InnerText;
+                ViewBag.tgbChatID = element.GetElementsByTagName("tgBotChatID")[0].InnerText;
+            }
+            return View();
+        }
+
+        [HttpPost]
+        public ActionResult TGBotfowardStatusChange(string kg, string tgbtoken, string tgbchatid)
+        {
+            string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
+            XmlDocument MyXml = new XmlDocument();
+            MyXml.Load(orgCodePath);
+            //获取<Rule>节点的所有子节点
+            XmlNodeList topM = MyXml.SelectNodes("//userSettings");
+            //遍历<Rule>下的所有子节点
+            foreach (XmlElement element in topM)
+            {
+                element.GetElementsByTagName("tgBotFowardStatus")[0].InnerText = kg == "false" ? "0" : "1";
+                element.GetElementsByTagName("tgBotToken")[0].InnerText = tgbtoken;
+                element.GetElementsByTagName("tgBotChatID")[0].InnerText = tgbchatid;
+            }
+            MyXml.Save(orgCodePath);
+            foreach (XmlElement element in topM)
+            {
+                ViewBag.status = element.GetElementsByTagName("tgBotFowardStatus")[0].InnerText == "0" ? "" : "checked=\"\"";
+                ViewBag.tgbToken = element.GetElementsByTagName("tgBotToken")[0].InnerText;
+                ViewBag.tgbChatID = element.GetElementsByTagName("tgBotChatID")[0].InnerText;
+            }
+            return View("TGBotfoward");
+        }
+
+
+
+
         public ActionResult EditPwd()
         {
             if (HttpContext.Session.GetString("uname") == null)
