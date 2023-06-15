@@ -50,7 +50,28 @@
         </div>
     </div>
     <script src="~/layuimini/lib/layui-v2.5.5/layui.js" charset="utf-8"></script>
+    <script src="~/lib/jquery/dist/jquery.js"></script>
+    <script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>
     <script>
+        $(function () {
+            var connection = new signalR.HubConnectionBuilder().withUrl("/smshub").build();
+            connection.on("reloadPageTable", function () {
+                layui.use(['table'], function () {
+                    var table = layui.table;
+                    table.reload('currentTableId', {
+                        page: {
+                            curr: 1
+                        }
+                    }, 'data');
+                });
+            });
+            connection.start().then(function () {
+                console.log("SignalR Connected");
+            }).catch(function (err) {
+                console.log(err.toString());
+            });
+        });
+
     layui.use(['form', 'table'], function () {
         var $ = layui.jquery,
             form = layui.form,

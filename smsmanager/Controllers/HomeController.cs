@@ -695,7 +695,45 @@ namespace smsmanager.Controllers
             }
             return View("TGBotfoward");
         }
+        public ActionResult DDBotfoward()
+        {
+            string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
+            XmlDocument xmldoc = new XmlDocument();
+            xmldoc.Load(orgCodePath);
+            XmlNodeList topM = xmldoc.SelectNodes("//userSettings");
+            foreach (XmlElement element in topM)
+            {
+                ViewBag.status = element.GetElementsByTagName("ddBotFowardStatus")[0].InnerText == "0" ? "" : "checked=\"\"";
+                ViewBag.ddbAccToken = element.GetElementsByTagName("ddBotAccToken")[0].InnerText;
+                ViewBag.ddbSecret = element.GetElementsByTagName("ddBotSecret")[0].InnerText;
+            }
+            return View();
+        }
 
+        [HttpPost]
+        public ActionResult DDBotfowardStatusChange(string kg, string ddbAcctoken, string ddbSecret)
+        {
+            string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
+            XmlDocument MyXml = new XmlDocument();
+            MyXml.Load(orgCodePath);
+            //获取<Rule>节点的所有子节点
+            XmlNodeList topM = MyXml.SelectNodes("//userSettings");
+            //遍历<Rule>下的所有子节点
+            foreach (XmlElement element in topM)
+            {
+                element.GetElementsByTagName("ddBotFowardStatus")[0].InnerText = kg == "false" ? "0" : "1";
+                element.GetElementsByTagName("ddBotAccToken")[0].InnerText = ddbAcctoken;
+                element.GetElementsByTagName("ddBotSecret")[0].InnerText = ddbSecret;
+            }
+            MyXml.Save(orgCodePath);
+            foreach (XmlElement element in topM)
+            {
+                ViewBag.status = element.GetElementsByTagName("ddBotFowardStatus")[0].InnerText == "0" ? "" : "checked=\"\"";
+                ViewBag.ddbAccToken = element.GetElementsByTagName("ddBotAccToken")[0].InnerText;
+                ViewBag.ddbSecret = element.GetElementsByTagName("ddBotSecret")[0].InnerText;
+            }
+            return View("DDBotfoward");
+        }
 
 
 

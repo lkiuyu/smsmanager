@@ -15,11 +15,21 @@ using smsmanager.Models;
 using static System.Net.Mime.MediaTypeNames;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Configuration;
+using System.Web;
+using smsmanager.refreshPage;
+using Microsoft.AspNetCore.SignalR;
 
 namespace smsmanagers
 {
     public static class smsForward
     {
+        private static IHubContext<ServerHub> _hubContext;
+        public static void Configure(IHubContext<ServerHub> hubContext)
+        {
+            _hubContext = hubContext;
+        }
+
         public static void smsTextForward()
         {
             string orgCodePath = AppDomain.CurrentDomain.BaseDirectory + "loginpassw.xml";
@@ -43,6 +53,7 @@ namespace smsmanagers
                                  string qystatus = "";
                                  string ppstatus = "";
                                  string tgbotStatus = "";
+                                 string ddbotStatus = "";
                                  string smtpHost = "";
                                  string smtpPort = "";
                                  string emailKey = "";
@@ -54,6 +65,8 @@ namespace smsmanagers
                                  string pptoken = "";
                                  string tgbToken = "";
                                  string tgbChatID = "";
+                                 string ddbToken = "";
+                                 string ddbSecret = "";
                                  XmlDocument xmldoc = new XmlDocument();
                                  xmldoc.Load(orgCodePath);
                                  XmlNodeList topM = xmldoc.SelectNodes("//userSettings");
@@ -63,6 +76,7 @@ namespace smsmanagers
                                      qystatus = element.GetElementsByTagName("WeChatQYFowardStatus")[0].InnerText;
                                      ppstatus = element.GetElementsByTagName("pushPlusFowardStatus")[0].InnerText;
                                      tgbotStatus = element.GetElementsByTagName("tgBotFowardStatus")[0].InnerText;
+                                     ddbotStatus = element.GetElementsByTagName("ddBotFowardStatus")[0].InnerText;
                                      smtpHost = element.GetElementsByTagName("smtpHost")[0].InnerText;
                                      smtpPort = element.GetElementsByTagName("smtpPort")[0].InnerText;
                                      emailKey = element.GetElementsByTagName("emailKey")[0].InnerText;
@@ -74,7 +88,8 @@ namespace smsmanagers
                                      pptoken = element.GetElementsByTagName("pushPlusToken")[0].InnerText;
                                      tgbToken = element.GetElementsByTagName("tgBotToken")[0].InnerText;
                                      tgbChatID = element.GetElementsByTagName("tgBotChatID")[0].InnerText;
-
+                                     ddbToken = element.GetElementsByTagName("ddBotAccToken")[0].InnerText;
+                                     ddbSecret = element.GetElementsByTagName("ddBotSecret")[0].InnerText;
                                  }
 
                                  var isms = connection.CreateProxy<ISms>("org.freedesktop.ModemManager1", change.path);
@@ -88,6 +103,59 @@ namespace smsmanagers
                                      smscontent = "";
                                      smscontent = await isms.GetTextAsync();
                                  } while (string.IsNullOrEmpty(smscontent));
+
+                                 JArray ja = new JArray();
+                                 StreamReader file = new StreamReader(smssavedPath, Encoding.Default);
+                                 string jsonstring = file.ReadToEnd();
+                                 file.Close();
+                                 file.Dispose();
+                                 bool SmsExistJudge = false;
+                                 if (jsonstring.Length > 0)
+                                 {
+                                     Sms[] datas = JsonConvert.DeserializeObject<Sms[]>(jsonstring);
+                                     foreach (Sms item in datas)
+                                     {
+                                         if (stime + "_" + tel + "_" + sid == item.sid)
+                                         {
+                                             SmsExistJudge = true;
+                                         }
+                                         JObject jobj = new JObject
+                                         {
+                                             { "sid", item.sid },
+                                             { "tel", item.tel },
+                                             { "text", item.text }
+                                         };
+                                         ja.Add(jobj);
+                                     }
+                                 }
+                                 if (!SmsExistJudge)
+                                 {
+                                     JObject jobj1 = new JObject
+                                     {
+                                         { "sid", stime + "_" + tel + "_" + sid },
+                                         { "tel", tel },
+                                         { "text", smscontent }
+                                     };
+                                     ja.Add(jobj1);
+                                 }
+                                 using (FileStream fs = new FileStream(smssavedPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite))
+                                 {
+                                     fs.Seek(0, SeekOrigin.Begin);
+                                     fs.SetLength(0);
+                                     using (StreamWriter sw = new StreamWriter(fs, Encoding.UTF8))
+                                     {
+                                         sw.Write(ja.ToString());
+                                     }
+                                 }
+                                 try
+                                 {
+                                     await _hubContext.Clients.All.SendAsync("reloadPageTable");
+                                 }
+                                 catch (Exception e)
+                                 {
+                                     Console.WriteLine(e);
+                                 }
+
                                  string body = "发信电话:" + tel + "\n" + "时间:" + stime + "\n" + "短信内容:" + smscontent;
                                  Console.WriteLine(body);
                                  if (status == "1")
@@ -218,50 +286,48 @@ namespace smsmanagers
                                      }
                                      
                                  }
+                                 if (ddbotStatus=="1")
+                                 {
+                                     try
+                                     {
+                                         string DING_TALK_BOT_URL = "https://oapi.dingtalk.com/robot/send?access_token=";
+                                         string url = DING_TALK_BOT_URL + ddbToken;
 
-                                 JArray ja = new JArray();
-                                 StreamReader file = new StreamReader(smssavedPath, Encoding.Default);
-                                 string jsonstring = file.ReadToEnd();
-                                 file.Close();
-                                 file.Dispose();
-                                 bool SmsExistJudge = false;
-                                 if (jsonstring.Length > 0)
-                                 {
-                                     Sms[] datas = JsonConvert.DeserializeObject<Sms[]>(jsonstring);
-                                     foreach (Sms item in datas)
-                                     {
-                                         if (stime + "_" + tel + "_" + sid == item.sid)
+                                         long timestamp = ConvertDateTimeToInt(DateTime.Now);
+                                         string sign = addSign(timestamp, ddbSecret);
+                                         url += $"&timestamp={timestamp}&sign={sign}";
+
+                                         JObject msgContent = new()
+                                            {
+                                                { "content", body }
+                                            };
+
+                                         JObject msgObj = new()
+                                            {
+                                                { "msgtype", "text" },
+                                                { "text", msgContent }
+                                            };
+
+                                         string resultResp = HttpHelper.Post(url, msgObj);
+                                         JObject jsonObjresult = JObject.Parse(resultResp);
+                                         string errcode1 = jsonObjresult["errcode"].ToString();
+                                         string errmsg1 = jsonObjresult["errmsg"].ToString();
+                                         if (errcode1 == "0" && errmsg1 == "ok")
                                          {
-                                             SmsExistJudge = true;
+                                             Console.WriteLine("钉钉转发成功");
                                          }
-                                         JObject jobj = new JObject
+                                         else
                                          {
-                                             { "sid", item.sid },
-                                             { "tel", item.tel },
-                                             { "text", item.text }
-                                         };
-                                         ja.Add(jobj);
+                                             Console.WriteLine(errmsg1);
+                                         }
+                                     }
+                                     catch (Exception ex)
+                                     {
+                                         Console.WriteLine(ex.Message);
                                      }
                                  }
-                                 if (!SmsExistJudge)
-                                 {
-                                     JObject jobj1 = new JObject
-                                     {
-                                         { "sid", stime + "_" + tel + "_" + sid },
-                                         { "tel", tel },
-                                         { "text", smscontent }
-                                     };
-                                     ja.Add(jobj1);
-                                 }
-                                 using (FileStream fs = new FileStream(smssavedPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite))
-                                 {
-                                     fs.Seek(0, SeekOrigin.Begin);
-                                     fs.SetLength(0);
-                                     using (StreamWriter sw = new StreamWriter(fs, Encoding.UTF8))
-                                     {
-                                         sw.Write(ja.ToString());
-                                     }
-                                 }
+
+                                 
                              }
                          }
                      );
@@ -271,7 +337,30 @@ namespace smsmanagers
             }
         }
 
-        
+        public static string addSign(long timestamp, string secret)
+        {
+            string secret1 = secret;
+            string stringToSign = timestamp + "\n" + secret1;
+            var encoding = new ASCIIEncoding();
+            byte[] keyByte = encoding.GetBytes(secret1);
+            byte[] messageBytes = encoding.GetBytes(stringToSign);
+            using (var hmacsha256 = new HMACSHA256(keyByte))
+            {
+                byte[] hashmessage = hmacsha256.ComputeHash(messageBytes);
+                return HttpUtility.UrlEncode(Convert.ToBase64String(hashmessage), Encoding.UTF8);
+            }
+        }
+
+        public static string Base64Encrypt(string input, Encoding encode)
+        {
+            return Convert.ToBase64String(encode.GetBytes(input));
+        }
+        public static long ConvertDateTimeToInt(DateTime time)
+        {
+            DateTime startTime = TimeZone.CurrentTimeZone.ToLocalTime(new DateTime(1970, 1, 1, 0, 0, 0, 0));
+            long t = (time.Ticks - startTime.Ticks) / 10000;   //除10000调整为13位      
+            return t;
+        }
 
     }
 }

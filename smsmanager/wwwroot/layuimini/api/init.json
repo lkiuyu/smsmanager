@@ -68,6 +68,12 @@
           "href": "Home/TGBotfoward",
           "icon": "fa fa-file-text",
           "target": "_self"
+        },
+        {
+          "title": "钉钉Bot转发",
+          "href": "Home/DDBotfoward",
+          "icon": "fa fa-file-text",
+          "target": "_self"
         }
       ]
     }

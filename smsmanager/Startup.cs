@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using smsmanager.refreshPage;
+using smsmanagers;
 
 namespace smsmanager
 {
@@ -22,6 +25,7 @@ namespace smsmanager
             services.AddControllersWithViews();
             services.AddSession();
             services.AddControllersWithViews().AddNewtonsoftJson();
+            services.AddSignalR();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -48,7 +52,10 @@ namespace smsmanager
                 endpoints.MapControllerRoute(
                     name: "default",
                     pattern: "{controller=Home}/{action=login}/{id?}");
+                endpoints.MapHub<ServerHub>("/smshub");
             });
+            var hubContext = app.ApplicationServices.GetRequiredService<IHubContext<ServerHub>>();
+            smsForward.Configure(hubContext);
         }
     }
 }

@@ -59,6 +59,9 @@ namespace smsmanager
                 CreateNode(xmlDoc, root, "tgBotFowardStatus", "0");
                 CreateNode(xmlDoc, root, "tgBotToken", "");
                 CreateNode(xmlDoc, root, "tgBotChatID", "");
+                CreateNode(xmlDoc, root, "ddBotFowardStatus", "0");
+                CreateNode(xmlDoc, root, "ddBotAccToken", "");
+                CreateNode(xmlDoc, root, "ddBotSecret", "");
 
                 try
                 {
