@@ -223,26 +223,6 @@ namespace smsmanager.Controllers
             }
             return RedirectToAction(from);
         }
-
-        //public void doubleDeleteSms(int id) 
-        //{
-        //    var psi = new System.Diagnostics.ProcessStartInfo("mmcli", " -m 0 --messaging-delete-sms=" + id);
-        //    psi.RedirectStandardOutput = true;
-        //    psi.UseShellExecute = false;
-        //    psi.RedirectStandardError = true;
-        //    using (var process = System.Diagnostics.Process.Start(psi))
-        //    {
-        //        var output = process.StandardOutput.ReadToEnd();
-        //        var error = process.StandardError.ReadToEnd();
-        //        process.Kill();
-        //        if (error.Trim() == "couldn't delete SMS: 'GDBus.Error:org.freedesktop.ModemManager1.Error.Core.Failed: Couldn't delete 1 parts from this SMS'")
-        //        {
-        //            doubleDeleteSms(id);
-        //        }
-        //    }
-            
-        //}
-
         public ActionResult Tempdsms()
         {
             return View();
@@ -351,7 +331,7 @@ namespace smsmanager.Controllers
                 var imsg = connection.CreateProxy<IMessaging>(service, objectPath);
                 Dictionary<string, object> smsdict = new Dictionary<string, object> { { "text", text }, { "number", tel } };
                 var sendsmsPath = imsg.CreateAsync(smsdict).Result;
-                return RedirectToAction("Tempdsms");
+                return RedirectToAction("SendingSms");
             }
         }
         public ActionResult SendingSms()
@@ -372,7 +352,7 @@ namespace smsmanager.Controllers
                 var sendsmsPath = imsg.CreateAsync(smsdict).Result;
                 var isms = connection.CreateProxy<ISms>("org.freedesktop.ModemManager1", sendsmsPath);
                 isms.SendAsync().Wait();
-                return View("Sendedsms");
+                return RedirectToAction("SendingSms");
             }
         }
         public ActionResult Receivesms()
